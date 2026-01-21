@@ -66,3 +66,56 @@ def adjust_stock(payload: StockAdjust):
         }
     except (KeyError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+# -------- Demo helpers (RESET / SEED) --------
+@router.post("/demo/reset")
+def demo_reset():
+    """
+    Reinicia el inventario en memoria (borra productos/almacenes/stock).
+    Útil cuando te hiciste bolas o quieres empezar limpio.
+    """
+    global store
+    store = InventoryStore()
+    return {"ok": True, "message": "Inventory reset (in-memory)."}
+
+
+@router.post("/demo/seed")
+def demo_seed():
+    """
+    Crea un escenario de prueba en 1 clic:
+    - Almacén Central (ALM-01)
+    - Producto Varilla 7018 (SKU-001)
+    - Stock = 100
+    """
+    # 1) Crear almacén (si no existe)
+    try:
+        w = store.create_warehouse(WarehouseCreate(code="ALM-01", name="Almacén Central"))
+    except ValueError:
+        # Ya existe con ese code: lo buscamos en la lista
+        w = next((x for x in store.list_warehouses() if x.code == "ALM-01"), None)
+        if w is None:
+            raise HTTPException(status_code=500, detail="Warehouse exists but could not be retrieved")
+
+    # 2) Crear producto (si no existe)
+    try:
+        p = store.create_product(ProductCreate(
+            sku="SKU-001",
+            name="Varilla 7018",
+            unit="pz",
+            description="Electrodo 7018"
+        ))
+    except ValueError:
+        # Ya existe con ese sku: lo buscamos en la lista
+        p = next((x for x in store.list_products() if x.sku == "SKU-001"), None)
+        if p is None:
+            raise HTTPException(status_code=500, detail="Product exists but could not be retrieved")
+
+    # 3) Set stock
+    store.set_stock(w.id, p.id, 100)
+
+    return {
+        "ok": True,
+        "warehouse": {"id": w.id, "code": w.code, "name": w.name},
+        "product": {"id": p.id, "sku": p.sku, "name": p.name},
+        "stock": {"warehouse_id": w.id, "product_id": p.id, "quantity": 100}
+    }
