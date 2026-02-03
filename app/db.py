@@ -1,20 +1,46 @@
+
+import os
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path("data") / "app.db"
+# =========================
+# Database path (local / cloud)
+# =========================
+# Local  : data/app.db
+# Render : /var/data/app.db  (with Persistent Disk + DB_DIR=/var/data)
+DB_DIR = Path(os.getenv("DB_DIR", "data"))
+DB_PATH = DB_DIR / "app.db"
 
+
+# =========================
+# Connection
+# =========================
 def get_conn() -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    """
+    Returns a SQLite connection.
+    Creates the DB directory automatically if it doesn't exist.
+    """
+    DB_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
+
+# =========================
+# Init DB (tables)
+# =========================
 def init_db() -> None:
+    """
+    Creates all tables if they don't exist.
+    Safe to run multiple times.
+    """
     conn = get_conn()
     cur = conn.cursor()
 
-    # Workers
+    # -------------------------------------------------
+    # WORKERS (ICA / employees)
+    # -------------------------------------------------
     cur.execute("""
     CREATE TABLE IF NOT EXISTS workers (
         employee_no TEXT PRIMARY KEY,
@@ -23,7 +49,9 @@ def init_db() -> None:
     );
     """)
 
-    # Vales
+    # -------------------------------------------------
+    # VALES (ICA legacy flow)
+    # -------------------------------------------------
     cur.execute("""
     CREATE TABLE IF NOT EXISTS vales (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,7 +68,9 @@ def init_db() -> None:
     );
     """)
 
-    # Vale items (mixed)
+    # -------------------------------------------------
+    # VALE ITEMS (mixed: herramienta / epp / consumible)
+    # -------------------------------------------------
     cur.execute("""
     CREATE TABLE IF NOT EXISTS vale_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,14 +78,6 @@ def init_db() -> None:
         kind TEXT NOT NULL, -- HERRAMIENTA, EPP, CONSUMIBLE
         item_name TEXT NOT NULL,
         qty INTEGER NOT NULL,
-        origin_location TEXT NOT NULL, -- SC-16, MC-06, etc.
+        origin_location TEXT NOT NULL, -- SC-16, M-06, etc.
         motive TEXT NOT NULL, -- PRESTAMO, TRASPASO, ENTREGA, CONSUMO
-        tool_state TEXT, -- EN_USO, DEVUELTA (solo para HERRAMIENTA)
-        returned_at TEXT,
-        note TEXT,
-        FOREIGN KEY(vale_id) REFERENCES vales(id) ON DELETE CASCADE
-    );
-    """)
-
-    conn.commit()
-    conn.close()
+        tool_state TEXT, -- EN_USO, DEVUELTA (solo
