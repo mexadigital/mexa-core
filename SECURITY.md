@@ -140,11 +140,23 @@ For security issues, please contact:
 
 ## Changelog
 
-### 2026-02-12
+### 2026-02-12 (Update 2)
+- **SECURITY FIX**: Updated gunicorn from 21.2.0 to 22.0.0
+  - Fixed: HTTP Request/Response Smuggling vulnerability (CVE-2024-1135)
+  - Fixed: Request smuggling leading to endpoint restriction bypass
+  - Impact: Critical security vulnerabilities patched
+  - Action: Immediate update to gunicorn 22.0.0
+
+- **SECURITY FIX**: Updated Flask-CORS from 4.0.0 to 4.0.2
+  - Fixed: Access-Control-Allow-Private-Network CORS header vulnerability
+  - Impact: Prevents unauthorized private network access
+  - Action: Updated to Flask-CORS 4.0.2
+
+### 2026-02-12 (Update 1)
 - Initial security audit completed
 - CodeQL scan passed
 - All code review issues resolved
-- No security vulnerabilities found
+- No security vulnerabilities found in application code
 
 ---
 
