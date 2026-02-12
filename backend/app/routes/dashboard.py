@@ -195,9 +195,61 @@ def get_historico_30_dias():
 @jwt_required()
 def get_resumen():
     """Get summary dashboard data"""
+    hoy = date.today()
+    
+    # Get consumo hoy
+    consumo = db.session.query(
+        Vale.disciplina,
+        func.sum(Vale.cantidad_salida).label('total')
+    ).filter(
+        Vale.fecha == hoy
+    ).group_by(
+        Vale.disciplina
+    ).all()
+    
+    consumo_hoy_result = {
+        'Civil': 0,
+        'Mecánica': 0,
+        'Eléctrica': 0,
+        'Total': 0
+    }
+    
+    for disciplina, total in consumo:
+        consumo_hoy_result[disciplina] = int(total) if total else 0
+        consumo_hoy_result['Total'] += consumo_hoy_result[disciplina]
+    
+    # Get stock actual
+    subquery = db.session.query(
+        Vale.producto_id,
+        func.max(Vale.created_at).label('max_created')
+    ).group_by(Vale.producto_id).subquery()
+    
+    vales_recientes = db.session.query(Vale).join(
+        subquery,
+        db.and_(
+            Vale.producto_id == subquery.c.producto_id,
+            Vale.created_at == subquery.c.max_created
+        )
+    ).all()
+    
+    productos = Producto.query.filter_by(activo=True).all()
+    
+    stock_dict = {}
+    for vale in vales_recientes:
+        stock_dict[vale.producto_id] = vale.stock_actual
+    
+    stock_actual_result = []
+    for producto in productos:
+        stock_actual = stock_dict.get(producto.id, 0)
+        stock_actual_result.append({
+            'producto_id': producto.id,
+            'producto_nombre': producto.nombre,
+            'stock_actual': stock_actual,
+            'stock_minimo': producto.stock_minimo,
+            'alerta': stock_actual < producto.stock_minimo
+        })
+    
     return jsonify({
-        'consumo_hoy': get_consumo_hoy()[0].json,
-        'stock_actual': get_stock_actual()[0].json,
-        'consumo_7_dias': get_consumo_7_dias()[0].json,
-        'consumo_satelite_7_dias': get_consumo_satelite_7_dias()[0].json
+        'consumo_hoy': consumo_hoy_result,
+        'stock_actual': stock_actual_result
     }), 200
