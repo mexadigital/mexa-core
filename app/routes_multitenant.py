@@ -9,12 +9,11 @@ Implements tenant-scoped routes for:
 
 All routes enforce tenant isolation and include audit logging.
 """
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, current_app
 from flask_jwt_extended import jwt_required
 from sqlalchemy import and_
 from sqlalchemy.exc import IntegrityError
 from app.app_factory import db
-from app.models_multitenant import Tenant, Usuario, Producto, Vale, AuditLog
 from app.middleware import require_tenant_context, validate_tenant_access
 from app.auth_utils import hash_password, verify_password, generate_token
 from app.audit_utils import log_audit
@@ -22,6 +21,13 @@ import logging
 import uuid
 
 logger = logging.getLogger(__name__)
+
+# Helper function to get models from current app
+def get_models():
+    """Get model classes from current app context"""
+    models = current_app.models
+    return (models['Tenant'], models['Usuario'], models['Producto'], 
+            models['Vale'], models['AuditLog'])
 
 # =============================================================================
 # BLUEPRINTS
@@ -50,6 +56,9 @@ def register():
             "tenant_slug": "default"  // optional, defaults to 'default'
         }
     """
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
+    
     try:
         data = request.get_json()
         
@@ -121,6 +130,7 @@ def login():
             "usuario": {...}
         }
     """
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
     try:
         data = request.get_json()
         
@@ -193,6 +203,7 @@ def create_vale():
     - Audit logging: All operations logged
     - Tenant isolation: Only access products in same tenant
     """
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
     try:
         data = request.get_json()
         tenant_id = g.tenant_id
@@ -312,6 +323,7 @@ def list_vales():
         - limit: Max results (default: 100)
         - offset: Pagination offset (default: 0)
     """
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
     try:
         tenant_id = g.tenant_id
         
@@ -346,6 +358,7 @@ def list_vales():
 @require_tenant_context
 def get_vale(vale_id):
     """Get a single vale by ID (tenant-scoped)"""
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
     try:
         tenant_id = g.tenant_id
         
@@ -373,6 +386,7 @@ def update_vale(vale_id):
             "comentario": "Updated notes"
         }
     """
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
     try:
         tenant_id = g.tenant_id
         data = request.get_json()
@@ -411,6 +425,7 @@ def update_vale(vale_id):
 @require_tenant_context
 def delete_vale(vale_id):
     """Delete vale (tenant-scoped) - soft delete by setting estado to 'cancelado'"""
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
     try:
         tenant_id = g.tenant_id
         
@@ -457,6 +472,7 @@ def create_producto():
             "stock": 10
         }
     """
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
     try:
         data = request.get_json()
         tenant_id = g.tenant_id
@@ -507,6 +523,7 @@ def create_producto():
 @require_tenant_context
 def list_productos():
     """List all products for current tenant"""
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
     try:
         tenant_id = g.tenant_id
         
@@ -534,6 +551,7 @@ def list_productos():
 @require_tenant_context
 def get_producto(producto_id):
     """Get a single product by ID (tenant-scoped)"""
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
     try:
         tenant_id = g.tenant_id
         
@@ -553,6 +571,7 @@ def get_producto(producto_id):
 @require_tenant_context
 def update_producto(producto_id):
     """Update product (tenant-scoped)"""
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
     try:
         tenant_id = g.tenant_id
         data = request.get_json()
@@ -602,6 +621,7 @@ def update_producto(producto_id):
 @require_tenant_context
 def delete_producto(producto_id):
     """Delete product (tenant-scoped) - soft delete"""
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
     try:
         tenant_id = g.tenant_id
         
@@ -637,6 +657,7 @@ def delete_producto(producto_id):
 @require_tenant_context
 def list_usuarios():
     """List all users for current tenant"""
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
     try:
         tenant_id = g.tenant_id
         
@@ -656,6 +677,7 @@ def list_usuarios():
 @require_tenant_context
 def get_usuario(usuario_id):
     """Get a single user by ID (tenant-scoped)"""
+    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
     try:
         tenant_id = g.tenant_id
         

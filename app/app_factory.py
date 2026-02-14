@@ -40,9 +40,20 @@ def create_app(config_name='default'):
     app.register_blueprint(productos_bp, url_prefix='/api/productos')
     app.register_blueprint(usuarios_bp, url_prefix='/api/usuarios')
     
-    # Create database tables
+    # Initialize models and create database tables
     with app.app_context():
-        from app.models_multitenant import Base, Tenant, Usuario, Producto, Vale, AuditLog
+        from app.models_multitenant import init_models
+        Tenant, Usuario, Producto, Vale, AuditLog = init_models(db)
+        
+        # Store models in app for access in other modules
+        app.models = {
+            'Tenant': Tenant,
+            'Usuario': Usuario,
+            'Producto': Producto,
+            'Vale': Vale,
+            'AuditLog': AuditLog
+        }
+        
         db.create_all()
         
         # Initialize default tenant if not exists

@@ -1,8 +1,7 @@
 """
 Audit logging utilities for multi-tenant application
 """
-from flask import request
-from app.models_multitenant import AuditLog
+from flask import request, current_app
 from app.middleware import get_tenant_id, get_usuario_id
 import json
 import logging
@@ -29,6 +28,9 @@ def log_audit(accion: str, entidad_tipo: str, entidad_id: int, detalles: dict = 
         return None
     
     try:
+        # Get AuditLog model from current app
+        AuditLog = current_app.models['AuditLog']
+        
         tenant_id = get_tenant_id()
         usuario_id = get_usuario_id()
         
