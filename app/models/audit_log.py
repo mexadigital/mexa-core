@@ -2,10 +2,10 @@
 Audit log model for tracking all critical actions in the system.
 Records user actions, resource changes, and maintains compliance trail.
 """
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index, JSON, Text
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
-from datetime import datetime
+from sqlalchemy import Column, Integer, String, DateTime, Index, Text
+from sqlalchemy.types import JSON as GenericJSON
+from sqlalchemy.sql import func
+from datetime import datetime, timezone
 import uuid
 from app.database import Base
 
@@ -25,28 +25,25 @@ class AuditLog(Base):
     # Request tracking
     request_id = Column(String(36), unique=True, nullable=False, index=True)
     
-    # User information
-    user_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
+    # User information - nullable integer, no foreign key constraint for flexibility
+    user_id = Column(Integer, nullable=True, index=True)
     
     # Action information
     action = Column(String(50), nullable=False, index=True)  # create, update, delete, login_failed, etc.
     resource_type = Column(String(50), nullable=False, index=True)  # vale, producto, usuario, etc.
     resource_id = Column(Integer, nullable=True, index=True)
     
-    # Change tracking
-    old_values = Column(JSON, nullable=True)  # State before change
-    new_values = Column(JSON, nullable=True)  # State after change
+    # Change tracking - Use GenericJSON for compatibility with SQLite
+    old_values = Column(GenericJSON, nullable=True)  # State before change
+    new_values = Column(GenericJSON, nullable=True)  # State after change
     
     # Request context
     endpoint = Column(String(255), nullable=True)  # /api/vales, /api/productos, etc.
     method = Column(String(10), nullable=True)  # POST, PUT, DELETE, GET
     ip_address = Column(String(45), nullable=True)  # IPv4 or IPv6 address
     
-    # Timestamp
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-    
-    # Relationships
-    user = relationship('User', foreign_keys=[user_id], backref='audit_logs')
+    # Timestamp - using timezone-aware datetime
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     
     # Composite indexes for common queries
     __table_args__ = (

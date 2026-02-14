@@ -4,9 +4,10 @@ Tests request ID generation, audit log creation, JSON log format, and error hand
 """
 import unittest
 import json
-import tempfile
 import os
 from flask import g
+
+# Tests use SQLite via DATABASE_URL environment variable set in conftest.py
 from app import create_app
 from app.database import SessionLocal, Base, engine
 from app.models.audit_log import AuditLog
@@ -215,7 +216,7 @@ class TestLogging(unittest.TestCase):
         """Test that there are no print() statements in production code."""
         import subprocess
         result = subprocess.run(
-            ['grep', '-r', 'print(', 'app/', '--include=*.py'],
+            ['grep', '-rn', r'\bprint\s*(', 'app/', '--include=*.py'],
             capture_output=True,
             text=True,
             cwd='/home/runner/work/mexa-core/mexa-core'
