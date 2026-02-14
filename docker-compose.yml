@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: mexa_user
+      POSTGRES_PASSWORD: mexa_password
+      POSTGRES_DB: mexa_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgresql://mexa_user:mexa_password@db:5432/mexa_db
+      LOG_LEVEL: INFO
+      FLASK_ENV: production
+    volumes:
+      - ./logs:/app/logs
+      - ./app:/app/app
+    depends_on:
+      - db
+    command: python run.py
+
+volumes:
+  postgres_data:
