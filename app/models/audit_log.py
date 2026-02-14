@@ -6,7 +6,6 @@ from sqlalchemy import Column, Integer, String, DateTime, Index, Text
 from sqlalchemy.types import JSON as GenericJSON
 from sqlalchemy.sql import func
 from datetime import datetime, timezone
-import uuid
 from app.database import Base
 
 
@@ -22,8 +21,8 @@ class AuditLog(Base):
     # Primary key
     id = Column(Integer, primary_key=True, autoincrement=True)
     
-    # Request tracking
-    request_id = Column(String(36), unique=True, nullable=False, index=True)
+    # Request tracking - each request can have multiple audit entries
+    request_id = Column(String(36), nullable=False, index=True)
     
     # User information - nullable integer, no foreign key constraint for flexibility
     user_id = Column(Integer, nullable=True, index=True)

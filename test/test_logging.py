@@ -215,11 +215,16 @@ class TestLogging(unittest.TestCase):
     def test_no_print_statements_in_code(self):
         """Test that there are no print() statements in production code."""
         import subprocess
+        import os
+        
+        # Use the test file's directory to find the repository root
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
         result = subprocess.run(
             ['grep', '-rn', r'\bprint\s*(', 'app/', '--include=*.py'],
             capture_output=True,
             text=True,
-            cwd='/home/runner/work/mexa-core/mexa-core'
+            cwd=repo_root
         )
         
         # grep returns exit code 1 if no matches found, which is what we want
@@ -285,6 +290,44 @@ class TestLogging(unittest.TestCase):
             self.assertEqual(audit_logs[0].action, 'create')
             self.assertEqual(audit_logs[1].action, 'update')
             self.assertEqual(audit_logs[2].action, 'delete')
+        finally:
+            db.close()
+    
+    def test_multiple_audit_logs_same_request(self):
+        """Test that multiple audit logs can be created for the same request."""
+        # This simulates a scenario where a single API call might trigger multiple audit events
+        db = SessionLocal()
+        try:
+            # Create two audit logs with the same request_id
+            request_id = 'test-request-123'
+            
+            audit1 = AuditLog(
+                request_id=request_id,
+                action='create',
+                resource_type='test',
+                resource_id=1,
+                new_values={'field': 'value1'}
+            )
+            db.add(audit1)
+            db.commit()
+            
+            audit2 = AuditLog(
+                request_id=request_id,
+                action='update',
+                resource_type='test',
+                resource_id=1,
+                old_values={'field': 'value1'},
+                new_values={'field': 'value2'}
+            )
+            db.add(audit2)
+            db.commit()
+            
+            # Query both logs
+            logs = db.query(AuditLog).filter_by(request_id=request_id).all()
+            self.assertEqual(len(logs), 2)
+            self.assertEqual(logs[0].action, 'create')
+            self.assertEqual(logs[1].action, 'update')
+            
         finally:
             db.close()
 

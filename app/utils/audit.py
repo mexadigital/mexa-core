@@ -3,6 +3,7 @@ Audit utility functions for logging critical actions to both database and logs.
 Provides centralized audit logging with automatic context capture.
 """
 import logging
+import uuid
 from flask import g, request
 from app.database import SessionLocal
 from app.models.audit_log import AuditLog
@@ -39,7 +40,8 @@ def log_audit(action, resource_type, resource_id=None, old_values=None, new_valu
     """
     try:
         # Capture context from Flask g object
-        request_id = g.request_id if hasattr(g, 'request_id') else 'unknown'
+        # If request_id not available, generate a new UUID to ensure unique identification
+        request_id = g.request_id if hasattr(g, 'request_id') else str(uuid.uuid4())
         ip_address = g.ip_address if hasattr(g, 'ip_address') else None
         
         # If ip_address not in g, try to get from request
