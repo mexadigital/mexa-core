@@ -57,7 +57,6 @@ def register():
         }
     """
     Tenant, Usuario, Producto, Vale, AuditLog = get_models()
-    Tenant, Usuario, Producto, Vale, AuditLog = get_models()
     
     try:
         data = request.get_json()
