@@ -1,0 +1,23 @@
+# Core Flask and Database
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.0.23
+alembic==1.13.0
+
+# Authentication
+Flask-JWT-Extended==4.6.0
+PyJWT==2.8.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Existing FastAPI (keep for compatibility)
+fastapi==0.115.0
+uvicorn==0.30.6
+pydantic==2.8.2
+python-multipart==0.0.9
+
+# Database driver
+psycopg2-binary==2.9.9
+
+# Utilities
+python-dotenv==1.0.0
