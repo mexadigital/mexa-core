@@ -9,6 +9,7 @@ Backend service for MEXA Core with structured logging and audit trail support.
 - Structured logging with audit trail
 - UUID-based request tracking
 - Docker support
+- **Gunicorn 22.0.0** - Latest version with security patches
 
 ## Database Migrations
 
