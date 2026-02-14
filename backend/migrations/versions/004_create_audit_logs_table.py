@@ -67,6 +67,6 @@ def downgrade():
     op.drop_index('ix_audit_logs_resource_id', table_name='audit_logs')
     op.drop_index('ix_audit_logs_resource_type', table_name='audit_logs')
     op.drop_index('ix_audit_logs_action', table_name='audit_logs')
-    op.create_index('ix_audit_logs_user_id', table_name='audit_logs')
+    op.drop_index('ix_audit_logs_user_id', table_name='audit_logs')
     op.drop_index('ix_audit_logs_request_id', table_name='audit_logs')
     op.drop_table('audit_logs')
