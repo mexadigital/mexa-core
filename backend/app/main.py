@@ -6,6 +6,13 @@ from app.core.config import settings
 from app.db.database import engine
 from app.db.base import Base
 
+# 👇 IMPORTAR MODELOS (IMPORTANTE para que SQLAlchemy registre las tablas)
+import app.models  # noqa: F401
+
+# 👇 IMPORTAR ROUTER DE PRODUCTOS
+from app.api.productos import router as productos_router
+
+
 # Configurar logging
 logging.basicConfig(
     level=logging.INFO,
@@ -23,6 +30,9 @@ app = FastAPI(
     version=settings.APP_VERSION,
 )
 
+# 👇 REGISTRAR ROUTERS
+app.include_router(productos_router)
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
@@ -32,7 +42,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔥 NUEVO ROOT ENDPOINT
+# Root endpoint
 @app.get("/")
 def root():
     return {
