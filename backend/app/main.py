@@ -32,6 +32,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 🔥 NUEVO ROOT ENDPOINT
+@app.get("/")
+def root():
+    return {
+        "nombre": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "status": "online"
+    }
+
 @app.get("/health")
 def health():
     """Health check"""
