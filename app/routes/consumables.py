@@ -1,40 +1,58 @@
-from flask import Blueprint, request, jsonify
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-consumables_bp = Blueprint('consumables', __name__)
+from app.database import SessionLocal
+from app.models import Consumable, ModoSerie
 
-# In-memory storage for consumables (for demonstration purposes)
-consumables = []
+router = APIRouter(prefix="/consumables", tags=["consumables"])
 
-@consumables_bp.route('/consumables', methods=['GET'])
-def get_consumables():
-    return jsonify(consumables), 200
 
-@consumables_bp.route('/consumables/<int:consumable_id>', methods=['GET'])
-def get_consumable(consumable_id):
-    consumable = next((c for c in consumables if c['id'] == consumable_id), None)
-    return jsonify(consumable), 200 if consumable else 404
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-@consumables_bp.route('/consumables', methods=['POST'])
-def create_consumable():
-    new_consumable = request.json
-    total_price = sum(item['price'] * item['quantity'] for item in new_consumable['items'])
-    new_consumable['total_price'] = total_price
-    new_consumable['id'] = len(consumables) + 1  # Simple ID assignment
-    consumables.append(new_consumable)
-    return jsonify(new_consumable), 201
 
-@consumables_bp.route('/consumables/<int:consumable_id>', methods=['PUT'])
-def update_consumable(consumable_id):
-    consumable = next((c for c in consumables if c['id'] == consumable_id), None)
+class ConsumableCreate(BaseModel):
+    name: str
+    epp_id: int
+    modo_serie: ModoSerie = ModoSerie.NINGUNA
+
+
+class ConsumableOut(BaseModel):
+    id: int
+    name: str
+    epp_id: int
+    modo_serie: ModoSerie
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("", response_model=list[ConsumableOut])
+def list_consumables(db: Session = Depends(get_db)):
+    return db.query(Consumable).all()
+
+
+@router.post("", response_model=ConsumableOut)
+def create_consumable(payload: ConsumableCreate, db: Session = Depends(get_db)):
+    new_consumable = Consumable(
+        name=payload.name,
+        epp_id=payload.epp_id,
+        modo_serie=payload.modo_serie
+    )
+    db.add(new_consumable)
+    db.commit()
+    db.refresh(new_consumable)
+    return new_consumable
+
+
+@router.get("/{consumable_id}", response_model=ConsumableOut)
+def get_consumable(consumable_id: int, db: Session = Depends(get_db)):
+    consumable = db.query(Consumable).filter(Consumable.id == consumable_id).first()
     if not consumable:
-        return jsonify({'message': 'Not found'}), 404
-    updated_data = request.json
-    consumable.update(updated_data)
-    consumable['total_price'] = sum(item['price'] * item['quantity'] for item in consumable.get('items', []))
-    return jsonify(consumable), 200
-
-@consumables_bp.route('/consumables/<int:consumable_id>', methods=['DELETE'])
-def delete_consumable(consumable_id):
-    global consumables
-    consumables = [c for c in consumables if c['id'] != consumable_id]
-    return jsonify({'message': 'Deleted successfully'}), 204
+        raise HTTPException(status_code=404, detail="Not found")
+    return consumable
