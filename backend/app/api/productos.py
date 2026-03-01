@@ -1,35 +1,35 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
 
-from app.db.database import SessionLocal
+from app.db.database import get_db
 from app.models.producto import Producto
+from app.models.organizacion import Organizacion
 from app.schemas.producto import ProductoCreate, ProductoOut
 
-
-router = APIRouter(
-    prefix="/productos",
-    tags=["Productos"]
-)
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+router = APIRouter(prefix="/productos", tags=["Productos"])
 
 
 @router.post("/", response_model=ProductoOut)
-def crear_producto(producto: ProductoCreate, db: Session = Depends(get_db)):
-    nuevo_producto = Producto(**producto.model_dump())
-    db.add(nuevo_producto)
+def crear_producto(payload: ProductoCreate, db: Session = Depends(get_db)):
+    # 1) Validar que exista la organización
+    org = db.query(Organizacion).filter(Organizacion.id == payload.organizacion_id).first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organización no existe")
+
+    # 2) Crear producto (AQUÍ estaba el bug: organizacion_id no se pasaba)
+    producto = Producto(
+        organizacion_id=payload.organizacion_id,  # ✅ CLAVE
+        nombre=payload.nombre,
+        codigo=payload.codigo,
+        tipo=payload.tipo,
+        cantidad=payload.cantidad,
+        ubicacion=payload.ubicacion,
+        precio=payload.precio,
+    )
+
+    # 3) Guardar
+    db.add(producto)
     db.commit()
-    db.refresh(nuevo_producto)
-    return nuevo_producto
+    db.refresh(producto)
 
-
-@router.get("/", response_model=List[ProductoOut])
-def listar_productos(db: Session = Depends(get_db)):
-    return db.query(Producto).all()
+    return producto
