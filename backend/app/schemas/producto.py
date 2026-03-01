@@ -4,11 +4,13 @@ from datetime import datetime
 
 
 class ProductoBase(BaseModel):
+    organizacion_id: int   # ✅ AGREGAR ESTO
+
     nombre: str
     codigo: Optional[str] = None
     tipo: str = "consumible"          # consumible / herramienta / epp
-    cantidad: int = 0                # stock
-    ubicacion: Optional[str] = None  # "Obra Mecánica", "SC-16", etc.
+    cantidad: int = 0                 # stock
+    ubicacion: Optional[str] = None
     precio: Optional[float] = None
 
 
