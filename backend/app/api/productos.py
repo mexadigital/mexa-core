@@ -11,14 +11,17 @@ router = APIRouter(prefix="/productos", tags=["Productos"])
 
 @router.post("/", response_model=ProductoOut)
 def crear_producto(payload: ProductoCreate, db: Session = Depends(get_db)):
-    # 1) Validar que exista la organización
-    org = db.query(Organizacion).filter(Organizacion.id == payload.organizacion_id).first()
+    # 🔎 1) Validar que exista la organización
+    org = db.query(Organizacion).filter(
+        Organizacion.id == payload.organizacion_id
+    ).first()
+
     if not org:
         raise HTTPException(status_code=404, detail="Organización no existe")
 
-    # 2) Crear producto (AQUÍ estaba el bug: organizacion_id no se pasaba)
+    # 🔥 2) Crear producto (AQUÍ estaba el problema antes)
     producto = Producto(
-        organizacion_id=payload.organizacion_id,  # ✅ CLAVE
+        organizacion_id=payload.organizacion_id,  # 👈 MUY IMPORTANTE
         nombre=payload.nombre,
         codigo=payload.codigo,
         tipo=payload.tipo,
@@ -27,7 +30,6 @@ def crear_producto(payload: ProductoCreate, db: Session = Depends(get_db)):
         precio=payload.precio,
     )
 
-    # 3) Guardar
     db.add(producto)
     db.commit()
     db.refresh(producto)
