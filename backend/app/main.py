@@ -1,58 +1,37 @@
-import logging
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db.database import engine
 from app.db.base import Base
 
-# 👇 IMPORTAR MODELOS (IMPORTANTE para que SQLAlchemy registre las tablas)
+# ✅ IMPORTANTE: registrar modelos antes de create_all
 import app.models  # noqa: F401
 
-# 👇 IMPORTAR ROUTERS
-from app.api.productos import router as productos_router
-from app.api.organizaciones.router import router as organizaciones_router  # ✅ NUEVO
+# ✅ Routers
+from app.api.productos.router import router as productos_router
+from app.api.organizaciones.router import router as organizaciones_router
+from app.api.movimientos.router.router import router as movimientos_router
 
-# Configurar logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
 
-# Crear todas las tablas
-Base.metadata.create_all(bind=engine)
-logger.info("Base de datos inicializada")
-
-# Crear instancia de FastAPI
 app = FastAPI(
-    title=settings.APP_NAME,
-    version=settings.APP_VERSION,
+    title="Mexa.Digital Core",
+    version="1.0.0"
 )
 
-# 👇 REGISTRAR ROUTERS
+# ✅ Crear tablas automáticamente (si no usas Alembic)
+Base.metadata.create_all(bind=engine)
+
+# ✅ Incluir routers
 app.include_router(productos_router)
-app.include_router(organizaciones_router)  # ✅ NUEVO
+app.include_router(organizaciones_router)
+app.include_router(movimientos_router)
 
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
-# Root endpoint
 @app.get("/")
 def root():
-    return {
-        "nombre": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "status": "online"
-    }
+    return {"message": "Mexa.Digital Core activo"}
+
 
 @app.get("/health")
 def health():
-    """Health check"""
     return {"ok": True}
