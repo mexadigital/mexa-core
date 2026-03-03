@@ -4,12 +4,13 @@ from app.core.config import settings
 from app.db.database import engine
 from app.db.base import Base
 
+# 🔥 Registrar modelos antes de create_all
 import app.models  # noqa: F401
 
-# ✅ IMPORTS CORRECTOS SEGÚN TU REPO
+# ✅ Imports correctos según tu estructura REAL
 from app.api.productos import router as productos_router
 from app.api.organizaciones.router import router as organizaciones_router
-from app.api.movimientos.router.router import router as movimientos_router
+from app.api.movimientos import router as movimientos_router
 
 
 app = FastAPI(
@@ -17,8 +18,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# ✅ Crear tablas automáticamente (si no usas Alembic)
 Base.metadata.create_all(bind=engine)
 
+# ✅ Incluir routers
 app.include_router(productos_router)
 app.include_router(organizaciones_router)
 app.include_router(movimientos_router)
