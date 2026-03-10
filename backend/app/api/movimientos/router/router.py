@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.db import get_db
+from app.db.database import get_db
 from app.models.movimiento import Movimiento
 from app.models.producto import Producto
 from app.schemas.movimiento import MovimientoCreate, MovimientoOut
