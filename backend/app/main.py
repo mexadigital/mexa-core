@@ -10,7 +10,7 @@ import app.models  # noqa: F401
 # ✅ Imports correctos según tu estructura REAL
 from app.api.productos import router as productos_router
 from app.api.organizaciones.router import router as organizaciones_router
-from app.api.movimientos import router as movimientos_router
+from app.api.movimientos.router.router import router as movimientos_router
 
 
 app = FastAPI(
