@@ -11,7 +11,7 @@ router = APIRouter(prefix="/productos", tags=["Productos"])
 
 @router.post("/", response_model=ProductoOut)
 def crear_producto(payload: ProductoCreate, db: Session = Depends(get_db)):
-    # 🔎 1) Validar que exista la organización
+    # 1) Validar que exista la organización
     org = db.query(Organizacion).filter(
         Organizacion.id == payload.organizacion_id
     ).first()
@@ -19,9 +19,9 @@ def crear_producto(payload: ProductoCreate, db: Session = Depends(get_db)):
     if not org:
         raise HTTPException(status_code=404, detail="Organización no existe")
 
-    # 🔥 2) Crear producto (AQUÍ estaba el problema antes)
+    # 2) Crear producto
     producto = Producto(
-        organizacion_id=payload.organizacion_id,  # 👈 MUY IMPORTANTE
+        organizacion_id=payload.organizacion_id,
         nombre=payload.nombre,
         codigo=payload.codigo,
         tipo=payload.tipo,
@@ -35,3 +35,9 @@ def crear_producto(payload: ProductoCreate, db: Session = Depends(get_db)):
     db.refresh(producto)
 
     return producto
+
+
+@router.get("/", response_model=list[ProductoOut])
+def listar_productos(db: Session = Depends(get_db)):
+    productos = db.query(Producto).order_by(Producto.id.desc()).all()
+    return productos
