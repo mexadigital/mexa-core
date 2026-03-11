@@ -36,7 +36,6 @@ def crear_producto(payload: ProductoCreate, db: Session = Depends(get_db)):
 
     return producto
 
-
 @router.get("/", response_model=list[ProductoOut])
 def listar_productos(db: Session = Depends(get_db)):
     productos = db.query(Producto).order_by(Producto.id.desc()).all()
