@@ -13,7 +13,6 @@ router = APIRouter(prefix="/productos", tags=["Productos"])
 @router.post("/", response_model=ProductoOut)
 def crear_producto(payload: ProductoCreate, db: Session = Depends(get_db)):
 
-    # Validar que exista la organización
     org = db.query(Organizacion).filter(
         Organizacion.id == payload.organizacion_id
     ).first()
@@ -21,7 +20,6 @@ def crear_producto(payload: ProductoCreate, db: Session = Depends(get_db)):
     if not org:
         raise HTTPException(status_code=404, detail="Organización no existe")
 
-    # Crear producto
     producto = Producto(
         organizacion_id=payload.organizacion_id,
         nombre=payload.nombre,
@@ -42,11 +40,13 @@ def crear_producto(payload: ProductoCreate, db: Session = Depends(get_db)):
 # Listar productos
 @router.get("/", response_model=list[ProductoOut])
 def listar_productos(db: Session = Depends(get_db)):
+
     productos = db.query(Producto).order_by(Producto.id.desc()).all()
+
     return productos
 
 
-# Obtener un producto por ID
+# Obtener producto por ID
 @router.get("/{producto_id}", response_model=ProductoOut)
 def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
 
