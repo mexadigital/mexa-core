@@ -9,7 +9,7 @@ import app.models  # noqa: F401
 from app.api.productos import router as productos_router
 from app.api.movimientos.router.router import router as movimientos_router
 
-app = FastAPI(title=settings.PROJECT_NAME)
+app = FastAPI(title=settings.APP_NAME)
 
 Base.metadata.create_all(bind=engine)
 
