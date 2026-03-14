@@ -16,7 +16,7 @@ Base.metadata.create_all(bind=engine)
 
 app.include_router(productos_router)
 app.include_router(movimientos_router)
-
+app.include_router(organizaciones_router)
 
 @app.get("/")
 def root():
