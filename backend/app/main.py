@@ -8,6 +8,7 @@ import app.models  # noqa: F401
 
 from app.api.productos import router as productos_router
 from app.api.movimientos.router.router import router as movimientos_router
+from app.api.organizaciones.router import router as organizaciones_router
 
 app = FastAPI(title=settings.APP_NAME)
 
