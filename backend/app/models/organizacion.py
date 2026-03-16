@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy.sql import func
 from app.db.base import Base
 
 
@@ -9,3 +10,4 @@ class Organizacion(Base):
     nombre = Column(String, unique=True, nullable=False, index=True)
     rfc = Column(String, nullable=True)
     plan = Column(String, nullable=False, default="basic")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
