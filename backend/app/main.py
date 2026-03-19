@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.db.database import engine
@@ -13,6 +14,19 @@ from app.api.inventario import router as inventario_router
 from app.api.auth import router as auth_router
 
 app = FastAPI(title=settings.APP_NAME)
+
+origins = [
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 Base.metadata.create_all(bind=engine)
 
