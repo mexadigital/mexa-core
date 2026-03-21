@@ -6,12 +6,21 @@ from app.models.producto import Producto
 from app.models.organizacion import Organizacion
 from app.schemas.producto import ProductoCreate, ProductoOut
 
+# 🔥 NUEVO
+from app.core.deps import get_current_user
+
 router = APIRouter(prefix="/productos", tags=["Productos"])
 
 
+# =========================
 # Crear producto
+# =========================
 @router.post("/", response_model=ProductoOut)
-def crear_producto(payload: ProductoCreate, db: Session = Depends(get_db)):
+def crear_producto(
+    payload: ProductoCreate,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)  # 🔒 protección
+):
 
     org = db.query(Organizacion).filter(
         Organizacion.id == payload.organizacion_id
@@ -37,18 +46,29 @@ def crear_producto(payload: ProductoCreate, db: Session = Depends(get_db)):
     return producto
 
 
+# =========================
 # Listar productos
+# =========================
 @router.get("/", response_model=list[ProductoOut])
-def listar_productos(db: Session = Depends(get_db)):
+def listar_productos(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)  # 🔒 protección
+):
 
     productos = db.query(Producto).order_by(Producto.id.desc()).all()
 
     return productos
 
 
+# =========================
 # Obtener producto por ID
+# =========================
 @router.get("/{producto_id}", response_model=ProductoOut)
-def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
+def obtener_producto(
+    producto_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)  # 🔒 protección
+):
 
     producto = db.query(Producto).filter(
         Producto.id == producto_id
