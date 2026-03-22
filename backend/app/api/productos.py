@@ -5,8 +5,6 @@ from app.db.database import get_db
 from app.models.producto import Producto
 from app.models.organizacion import Organizacion
 from app.schemas.producto import ProductoCreate, ProductoOut
-
-# 🔥 NUEVO
 from app.core.deps import get_current_user
 
 router = APIRouter(prefix="/productos", tags=["Productos"])
@@ -19,18 +17,17 @@ router = APIRouter(prefix="/productos", tags=["Productos"])
 def crear_producto(
     payload: ProductoCreate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)  # 🔒 protección
+    user=Depends(get_current_user)
 ):
-
     org = db.query(Organizacion).filter(
-        Organizacion.id == payload.organizacion_id
+        Organizacion.id == user["organizacion_id"]
     ).first()
 
     if not org:
         raise HTTPException(status_code=404, detail="Organización no existe")
 
     producto = Producto(
-        organizacion_id=payload.organizacion_id,
+        organizacion_id=user["organizacion_id"],
         nombre=payload.nombre,
         codigo=payload.codigo,
         tipo=payload.tipo,
@@ -52,10 +49,11 @@ def crear_producto(
 @router.get("/", response_model=list[ProductoOut])
 def listar_productos(
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)  # 🔒 protección
+    user=Depends(get_current_user)
 ):
-
-    productos = db.query(Producto).order_by(Producto.id.desc()).all()
+    productos = db.query(Producto).filter(
+        Producto.organizacion_id == user["organizacion_id"]
+    ).order_by(Producto.id.desc()).all()
 
     return productos
 
@@ -67,11 +65,11 @@ def listar_productos(
 def obtener_producto(
     producto_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)  # 🔒 protección
+    user=Depends(get_current_user)
 ):
-
     producto = db.query(Producto).filter(
-        Producto.id == producto_id
+        Producto.id == producto_id,
+        Producto.organizacion_id == user["organizacion_id"]
     ).first()
 
     if not producto:
