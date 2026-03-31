@@ -12,6 +12,7 @@ from app.api.movimientos.router.router import router as movimientos_router
 from app.api.organizaciones.router import router as organizaciones_router
 from app.api.inventario import router as inventario_router
 from app.api.auth import router as auth_router
+from app.api.ubicaciones import router as ubicaciones_router
 
 app = FastAPI(title=settings.APP_NAME)
 
@@ -35,6 +36,7 @@ app.include_router(movimientos_router)
 app.include_router(organizaciones_router)
 app.include_router(inventario_router)
 app.include_router(auth_router)
+app.include_router(ubicaciones_router)
 
 
 @app.get("/")
