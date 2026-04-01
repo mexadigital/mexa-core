@@ -5,20 +5,34 @@ from app.core.config import settings
 from app.db.database import engine
 from app.db.base import Base
 
+# Registrar modelos antes de create_all
 import app.models  # noqa: F401
 
-from app.api.productos import router as productos_router
-from app.api.movimientos.router.router import router as movimientos_router
-from app.api.organizaciones.router import router as organizaciones_router
-from app.api.inventario import router as inventario_router
+# Routers
 from app.api.auth import router as auth_router
+from app.api.organizaciones import router as organizaciones_router
+from app.api.productos import router as productos_router
+from app.api.movimientos import router as movimientos_router
 from app.api.ubicaciones import router as ubicaciones_router
+from app.api.inventario_ubicaciones import router as inventario_ubicaciones_router
+from app.api.traspasos import router as traspasos_router
 
-app = FastAPI(title=settings.APP_NAME)
 
+# Crear tablas
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    debug=settings.DEBUG,
+)
+
+# CORS
 origins = [
     "http://localhost:5500",
     "http://127.0.0.1:5500",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
 
 app.add_middleware(
@@ -29,21 +43,60 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-Base.metadata.create_all(bind=engine)
-
-app.include_router(productos_router)
-app.include_router(movimientos_router)
-app.include_router(organizaciones_router)
-app.include_router(inventario_router)
-app.include_router(auth_router)
-app.include_router(ubicaciones_router)
-
 
 @app.get("/")
 def root():
-    return {"message": "Mexa Core funcionando 🚀"}
+    return {
+        "message": "Mexa Digital API funcionando",
+        "version": settings.APP_VERSION,
+    }
 
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+# Auth
+app.include_router(
+    auth_router,
+    prefix="/auth",
+    tags=["Auth"],
+)
+
+# Organizaciones
+app.include_router(
+    organizaciones_router,
+    prefix="/organizaciones",
+    tags=["Organizaciones"],
+)
+
+# Productos
+app.include_router(
+    productos_router,
+    prefix="/productos",
+    tags=["Productos"],
+)
+
+# Movimientos globales
+app.include_router(
+    movimientos_router,
+    prefix="/movimientos",
+    tags=["Movimientos"],
+)
+
+# Ubicaciones
+app.include_router(
+    ubicaciones_router,
+    prefix="/ubicaciones",
+    tags=["Ubicaciones"],
+)
+
+# Inventario por ubicación
+app.include_router(
+    inventario_ubicaciones_router,
+    prefix="/inventario-ubicaciones",
+    tags=["Inventario Ubicaciones"],
+)
+
+# Traspasos
+app.include_router(
+    traspasos_router,
+    prefix="/traspasos",
+    tags=["Traspasos"],
+)
