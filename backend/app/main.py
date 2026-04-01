@@ -10,7 +10,7 @@ import app.models  # noqa: F401
 
 # Routers
 from app.api.auth import router as auth_router
-from app.api.organizaciones import router as organizaciones_router
+from app.api.organizaciones.router import router as organizaciones_router
 from app.api.productos import router as productos_router
 from app.api.movimientos import router as movimientos_router
 from app.api.ubicaciones import router as ubicaciones_router
@@ -18,7 +18,6 @@ from app.api.inventario_ubicaciones import router as inventario_ubicaciones_rout
 from app.api.traspasos import router as traspasos_router
 
 
-# Crear tablas
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -27,7 +26,6 @@ app = FastAPI(
     debug=settings.DEBUG,
 )
 
-# CORS
 origins = [
     "http://localhost:5500",
     "http://127.0.0.1:5500",
@@ -52,51 +50,14 @@ def root():
     }
 
 
-# Auth
-app.include_router(
-    auth_router,
-    prefix="/auth",
-    tags=["Auth"],
-)
-
-# Organizaciones
-app.include_router(
-    organizaciones_router,
-    prefix="/organizaciones",
-    tags=["Organizaciones"],
-)
-
-# Productos
-app.include_router(
-    productos_router,
-    prefix="/productos",
-    tags=["Productos"],
-)
-
-# Movimientos globales
-app.include_router(
-    movimientos_router,
-    prefix="/movimientos",
-    tags=["Movimientos"],
-)
-
-# Ubicaciones
-app.include_router(
-    ubicaciones_router,
-    prefix="/ubicaciones",
-    tags=["Ubicaciones"],
-)
-
-# Inventario por ubicación
+app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(organizaciones_router, prefix="/organizaciones", tags=["Organizaciones"])
+app.include_router(productos_router, prefix="/productos", tags=["Productos"])
+app.include_router(movimientos_router, prefix="/movimientos", tags=["Movimientos"])
+app.include_router(ubicaciones_router, prefix="/ubicaciones", tags=["Ubicaciones"])
 app.include_router(
     inventario_ubicaciones_router,
     prefix="/inventario-ubicaciones",
     tags=["Inventario Ubicaciones"],
 )
-
-# Traspasos
-app.include_router(
-    traspasos_router,
-    prefix="/traspasos",
-    tags=["Traspasos"],
-)
+app.include_router(traspasos_router, prefix="/traspasos", tags=["Traspasos"])
