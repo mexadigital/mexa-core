@@ -5,3 +5,4 @@ from app.models.movimiento import Movimiento
 from app.models.ubicacion import Ubicacion
 from app.models.inventario_ubicacion import InventarioUbicacion
 from app.models.traspaso import Traspaso
+from app.models.venta import Venta
