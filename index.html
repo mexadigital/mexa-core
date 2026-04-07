@@ -2,639 +2,158 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Mexa POS</title>
+
   <style>
-    :root {
-      --bg: #f4f6f8;
-      --card: #ffffff;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --border: #d1d5db;
-      --header: #f9fafb;
-      --button: #111827;
-      --button-hover: #000000;
-      --ok: #166534;
-      --error: #b91c1c;
-      --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-      --radius: 12px;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      padding: 24px;
-      font-family: Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-    }
-
-    h1, h2, h3 {
-      margin-top: 0;
-    }
-
-    .wrap {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-    }
-
-    .badge {
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: #e5e7eb;
-      font-size: 14px;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-
-    .card {
-      background: var(--card);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      border: 1px solid var(--border);
-      overflow: hidden;
-    }
-
-    .card-header {
-      background: var(--header);
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
-      font-weight: bold;
-    }
-
-    .card-body {
-      padding: 16px;
-    }
-
-    input, select, button, textarea {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      font-size: 14px;
-      margin-bottom: 12px;
-    }
-
-    button {
-      background: var(--button);
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-weight: bold;
-    }
-
-    button:hover {
-      background: var(--button-hover);
-    }
-
-    .row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-
-    .productos-lista,
-    .resultados-lista,
-    .carrito-lista {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-
-    .productos-lista li,
-    .resultados-lista li,
-    .carrito-lista li {
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      margin-bottom: 8px;
-      background: white;
-    }
-
-    .resultados-lista li {
-      cursor: pointer;
-    }
-
-    .resultados-lista li:hover {
-      background: #f3f4f6;
-    }
-
-    .carrito-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .mini-btn {
-      width: auto;
-      margin: 0;
-      padding: 8px 10px;
-      font-size: 12px;
-      border-radius: 8px;
-    }
-
-    .danger {
-      background: var(--error);
-    }
-
-    .success {
-      color: var(--ok);
-      font-weight: bold;
-    }
-
-    .error {
-      color: var(--error);
-      font-weight: bold;
-    }
-
-    .muted {
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .ticket {
-      background: #fff;
-      border: 1px dashed #9ca3af;
-      padding: 16px;
-      border-radius: 10px;
-      font-family: monospace;
-      white-space: pre-wrap;
-      min-height: 240px;
-    }
-
-    .total-box {
-      font-size: 22px;
-      font-weight: bold;
-      margin-bottom: 12px;
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    @media (max-width: 900px) {
-      .grid {
-        grid-template-columns: 1fr;
-      }
-
-      .row {
-        grid-template-columns: 1fr;
-      }
-    }
+    body { font-family: Arial; background:#f4f6f8; padding:20px; }
+    .card { background:white; padding:15px; margin-bottom:15px; border-radius:10px; }
+    input, button, select { width:100%; padding:10px; margin-bottom:10px; }
+    ul { list-style:none; padding:0; }
+    li { background:#eee; padding:8px; margin-bottom:5px; cursor:pointer; }
+    .danger { background:red; color:white; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="topbar">
-      <h1>Mexa POS</h1>
-      <div>
-        <span class="badge" id="estadoSesion">Sin sesión</span>
-      </div>
-    </div>
-
-    <div class="grid">
-      <!-- LOGIN -->
-      <div class="card">
-        <div class="card-header">Login</div>
-        <div class="card-body">
-          <input type="email" id="email" placeholder="Correo" />
-          <input type="password" id="password" placeholder="Contraseña" />
-          <button onclick="login()">Iniciar sesión</button>
-          <button onclick="logout()" class="danger">Cerrar sesión</button>
-          <p id="loginEstado" class="muted"></p>
-        </div>
-      </div>
-
-      <!-- BÚSQUEDA -->
-      <div class="card">
-        <div class="card-header">Búsqueda rápida</div>
-        <div class="card-body">
-          <input
-            type="text"
-            id="busqueda"
-            placeholder="Buscar por código, clave o descripción..."
-            oninput="buscarProductos()"
-          />
-          <ul id="resultados" class="resultados-lista"></ul>
-        </div>
-      </div>
-
-      <!-- PRODUCTOS -->
-      <div class="card">
-        <div class="card-header">Productos</div>
-        <div class="card-body">
-          <button onclick="cargarProductos()">Cargar productos</button>
-          <ul id="listaProductos" class="productos-lista"></ul>
-        </div>
-      </div>
-
-      <!-- CARRITO -->
-      <div class="card">
-        <div class="card-header">Carrito / Cobro</div>
-        <div class="card-body">
-          <ul id="carrito" class="carrito-lista"></ul>
-
-          <div class="total-box">Total: $<span id="total">0.00</span></div>
-
-          <select id="formaPago">
-            <option value="efectivo">Efectivo</option>
-            <option value="tarjeta">Tarjeta</option>
-            <option value="transferencia">Transferencia</option>
-          </select>
-
-          <input
-            type="number"
-            id="montoRecibido"
-            placeholder="Monto recibido"
-            oninput="calcularCambio()"
-          />
-
-          <p><strong>Cambio:</strong> $<span id="cambio">0.00</span></p>
-
-          <button onclick="registrarVenta()">Registrar venta</button>
-          <button onclick="vaciarCarrito()" class="danger">Vaciar carrito</button>
-
-          <p id="ventaEstado" class="muted"></p>
-        </div>
-      </div>
-
-      <!-- TICKET -->
-      <div class="card" style="grid-column: 1 / -1;">
-        <div class="card-header">Ticket</div>
-        <div class="card-body">
-          <div class="ticket" id="ticketPreview">Aquí aparecerá el ticket...</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    const API_URL = "https://mexa-core-1.onrender.com";
-
-    let productosCache = [];
-    let carrito = [];
-
-    function actualizarEstadoSesion() {
-      const token = localStorage.getItem("mexa_token");
-      const estado = document.getElementById("estadoSesion");
-      estado.textContent = token ? "Sesión activa" : "Sin sesión";
-      estado.style.background = token ? "#dcfce7" : "#e5e7eb";
-    }
-
-    async function login() {
-      const email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value.trim();
-      const estado = document.getElementById("loginEstado");
-
-      estado.className = "muted";
-      estado.textContent = "Iniciando sesión...";
-
-      try {
-        const res = await fetch(`${API_URL}/auth/auth/login`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          body: new URLSearchParams({
-            username: email,
-            password: password
-          })
-        });
-
-        const data = await res.json();
-        console.log("LOGIN RESPONSE:", data);
-
-        if (!res.ok || !data.access_token) {
-          estado.className = "error";
-          estado.textContent = data.detail || "No se pudo iniciar sesión";
-          return;
-        }
-
-        localStorage.setItem("mexa_token", data.access_token);
-        estado.className = "success";
-        estado.textContent = "Login correcto";
-        actualizarEstadoSesion();
-      } catch (error) {
-        console.error(error);
-        estado.className = "error";
-        estado.textContent = "Error de conexión con backend";
-      }
-    }
-
-    function logout() {
-      localStorage.removeItem("mexa_token");
-      actualizarEstadoSesion();
-      document.getElementById("loginEstado").className = "muted";
-      document.getElementById("loginEstado").textContent = "Sesión cerrada";
-    }
-
-    function getToken() {
-      return localStorage.getItem("mexa_token");
-    }
-
-    async function cargarProductos() {
-      const token = getToken();
-      const lista = document.getElementById("listaProductos");
-      lista.innerHTML = "<li>Cargando...</li>";
-
-      if (!token) {
-        lista.innerHTML = "<li class='error'>Primero inicia sesión</li>";
-        return;
-      }
-
-      try {
-        const res = await fetch(`${API_URL}/productos/productos/`, {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
-        });
-
-        const data = await res.json();
-        console.log("PRODUCTOS RESPONSE:", data);
-
-        if (!res.ok) {
-          lista.innerHTML = `<li class="error">${data.detail || "Error al cargar productos"}</li>`;
-          return;
-        }
-
-        productosCache = Array.isArray(data) ? data : [];
-
-        if (productosCache.length === 0) {
-          lista.innerHTML = "<li>No hay productos</li>";
-          return;
-        }
-
-        lista.innerHTML = "";
-        productosCache.forEach((p) => {
-          const li = document.createElement("li");
-          li.innerHTML = `
-            <strong>${p.nombre || "Sin nombre"}</strong><br>
-            Código: ${p.codigo || "-"}<br>
-            Precio: $${Number(p.precio || 0).toFixed(2)}<br>
-            Stock: ${p.cantidad ?? 0}
-            <br><br>
-            <button class="mini-btn" onclick="agregarAlCarritoPorId(${p.id})">Agregar</button>
-          `;
-          lista.appendChild(li);
-        });
-      } catch (error) {
-        console.error(error);
-        lista.innerHTML = "<li class='error'>Error de conexión</li>";
-      }
-    }
-
-    function buscarProductos() {
-      const texto = document.getElementById("busqueda").value.trim().toLowerCase();
-      const resultados = document.getElementById("resultados");
-
-      if (!productosCache.length) {
-        resultados.innerHTML = "<li>Carga productos primero</li>";
-        return;
-      }
-
-      if (texto.length === 0) {
-        resultados.innerHTML = "";
-        return;
-      }
-
-      const filtrados = productosCache.filter((p) => {
-        const nombre = (p.nombre || "").toLowerCase();
-        const codigo = (p.codigo || "").toLowerCase();
-        const descripcion = (p.descripcion || "").toLowerCase();
-        return (
-          nombre.includes(texto) ||
-          codigo.includes(texto) ||
-          descripcion.includes(texto)
-        );
-      });
-
-      resultados.innerHTML = "";
-
-      if (filtrados.length === 0) {
-        resultados.innerHTML = "<li>No se encontraron productos</li>";
-        return;
-      }
-
-      filtrados.slice(0, 20).forEach((p) => {
-        const li = document.createElement("li");
-        li.innerHTML = `
-          <strong>${p.nombre || "Sin nombre"}</strong><br>
-          Código: ${p.codigo || "-"} | Precio: $${Number(p.precio || 0).toFixed(2)}
-        `;
-        li.onclick = () => {
-          agregarAlCarrito(p);
-          document.getElementById("busqueda").value = "";
-          resultados.innerHTML = "";
-        };
-        resultados.appendChild(li);
-      });
-    }
-
-    function agregarAlCarritoPorId(id) {
-      const producto = productosCache.find((p) => p.id === id);
-      if (producto) {
-        agregarAlCarrito(producto);
-      }
-    }
-
-    function agregarAlCarrito(producto) {
-      const existente = carrito.find((item) => item.id === producto.id);
-
-      if (existente) {
-        existente.cantidad += 1;
-      } else {
-        carrito.push({
-          id: producto.id,
-          nombre: producto.nombre,
-          codigo: producto.codigo || "",
-          precio: Number(producto.precio || 0),
-          cantidad: 1
-        });
-      }
-
-      renderCarrito();
-    }
-
-    function quitarDelCarrito(id) {
-      carrito = carrito.filter((item) => item.id !== id);
-      renderCarrito();
-    }
-
-    function cambiarCantidad(id, delta) {
-      const item = carrito.find((p) => p.id === id);
-      if (!item) return;
-
-      item.cantidad += delta;
-
-      if (item.cantidad <= 0) {
-        quitarDelCarrito(id);
-        return;
-      }
-
-      renderCarrito();
-    }
-
-    function vaciarCarrito() {
-      carrito = [];
-      renderCarrito();
-      document.getElementById("ventaEstado").textContent = "";
-    }
-
-    function renderCarrito() {
-      const lista = document.getElementById("carrito");
-      const totalEl = document.getElementById("total");
-      lista.innerHTML = "";
-
-      if (carrito.length === 0) {
-        lista.innerHTML = "<li>Carrito vacío</li>";
-      } else {
-        carrito.forEach((item) => {
-          const subtotal = item.precio * item.cantidad;
-          const li = document.createElement("li");
-          li.innerHTML = `
-            <div class="carrito-item">
-              <div>
-                <strong>${item.nombre}</strong><br>
-                Código: ${item.codigo || "-"}<br>
-                $${item.precio.toFixed(2)} x ${item.cantidad} = $${subtotal.toFixed(2)}
-              </div>
-              <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                <button class="mini-btn" onclick="cambiarCantidad(${item.id}, -1)">-1</button>
-                <button class="mini-btn" onclick="cambiarCantidad(${item.id}, 1)">+1</button>
-                <button class="mini-btn danger" onclick="quitarDelCarrito(${item.id})">Quitar</button>
-              </div>
-            </div>
-          `;
-          lista.appendChild(li);
-        });
-      }
-
-      const total = carrito.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
-      totalEl.textContent = total.toFixed(2);
-
-      calcularCambio();
-      generarTicket();
-    }
-
-    function calcularCambio() {
-      const total = Number(document.getElementById("total").textContent || 0);
-      const recibido = Number(document.getElementById("montoRecibido").value || 0);
-      const cambio = recibido - total;
-      document.getElementById("cambio").textContent = cambio > 0 ? cambio.toFixed(2) : "0.00";
-      generarTicket();
-    }
-
-    function generarTicket() {
-      const total = Number(document.getElementById("total").textContent || 0).toFixed(2);
-      const formaPago = document.getElementById("formaPago").value;
-      const recibido = Number(document.getElementById("montoRecibido").value || 0).toFixed(2);
-      const cambio = document.getElementById("cambio").textContent;
-
-      const ahora = new Date();
-      const fecha = ahora.toLocaleDateString("es-MX");
-      const hora = ahora.toLocaleTimeString("es-MX");
-
-      let lineas = "";
-      carrito.forEach((item) => {
-        lineas += `${item.nombre}\n`;
-        lineas += `  ${item.cantidad} x $${item.precio.toFixed(2)} = $${(item.cantidad * item.precio).toFixed(2)}\n`;
-      });
-
-      const ticket = `
-MEXA POS
-Nombre tienda: Woppy Demo
-Dirección fiscal: PENDIENTE
-Fecha: ${fecha}
-Hora: ${hora}
-
-PRODUCTOS
-${lineas || "Sin productos"}
-
-TOTAL: $${total}
-Forma de pago: ${formaPago}
-Recibido: $${recibido}
-Cambio: $${cambio}
-      `.trim();
-
-      document.getElementById("ticketPreview").textContent = ticket;
-    }
-
-    async function registrarVenta() {
-      const token = getToken();
-      const estado = document.getElementById("ventaEstado");
-
-      if (!token) {
-        estado.className = "error";
-        estado.textContent = "Primero inicia sesión";
-        return;
-      }
-
-      if (carrito.length === 0) {
-        estado.className = "error";
-        estado.textContent = "El carrito está vacío";
-        return;
-      }
-
-      estado.className = "muted";
-      estado.textContent = "Registrando venta...";
-
-      try {
-        for (const item of carrito) {
-          const res = await fetch(`${API_URL}/movimientos/`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              producto_id: item.id,
-              tipo: "salida",
-              cantidad: item.cantidad,
-              usuario: "POS Web"
-            })
-          });
-
-          const data = await res.json();
-          console.log("MOVIMIENTO RESPONSE:", data);
-
-          if (!res.ok) {
-            estado.className = "error";
-            estado.textContent = data.detail || `Error registrando ${item.nombre}`;
-            return;
-          }
-        }
-
-        estado.className = "success";
-        estado.textContent = "Venta registrada correctamente";
-        vaciarCarrito();
-        cargarProductos();
-      } catch (error) {
-        console.error(error);
-        estado.className = "error";
-        estado.textContent = "Error de conexión al registrar venta";
-      }
-    }
-
-    actualizarEstadoSesion();
-    generarTicket();
-  </script>
+
+<h1>Mexa POS</h1>
+
+<div class="card">
+  <h3>Login</h3>
+  <input id="email" placeholder="Correo"/>
+  <input id="password" type="password" placeholder="Contraseña"/>
+  <button onclick="login()">Login</button>
+  <p id="loginEstado"></p>
+</div>
+
+<div class="card">
+  <h3>Búsqueda</h3>
+  <input id="busqueda" placeholder="Buscar producto..." oninput="buscar()"/>
+  <ul id="resultados"></ul>
+</div>
+
+<div class="card">
+  <h3>Carrito</h3>
+  <ul id="carrito"></ul>
+  <p>Total: $<span id="total">0</span></p>
+
+  <select id="formaPago">
+    <option value="efectivo">Efectivo</option>
+    <option value="tarjeta">Tarjeta</option>
+  </select>
+
+  <input id="monto" placeholder="Recibido" oninput="cambioCalc()"/>
+  <p>Cambio: $<span id="cambio">0</span></p>
+
+  <button onclick="vender()">Vender</button>
+</div>
+
+<script>
+const API = "https://mexa-core-1.onrender.com";
+let productos = [];
+let carrito = [];
+
+// LOGIN (CORREGIDO JSON)
+async function login(){
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const estado = document.getElementById("loginEstado");
+
+  const res = await fetch(API + "/auth/auth/login", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify({ email, password })
+  });
+
+  const data = await res.json();
+  console.log(data);
+
+  if(res.ok){
+    localStorage.setItem("token", data.access_token);
+    estado.innerText = "Login OK";
+    cargarProductos();
+  } else {
+    estado.innerText = data.detail;
+  }
+}
+
+// CARGAR PRODUCTOS
+async function cargarProductos(){
+  const res = await fetch(API + "/productos/productos/", {
+    headers:{ Authorization:"Bearer "+localStorage.getItem("token") }
+  });
+  productos = await res.json();
+}
+
+// BUSCAR
+function buscar(){
+  const texto = document.getElementById("busqueda").value.toLowerCase();
+  const lista = document.getElementById("resultados");
+  lista.innerHTML="";
+
+  productos.filter(p =>
+    p.nombre.toLowerCase().includes(texto) ||
+    (p.codigo && p.codigo.toLowerCase().includes(texto))
+  ).forEach(p=>{
+    const li=document.createElement("li");
+    li.innerText=p.nombre+" $"+p.precio;
+    li.onclick=()=>add(p);
+    lista.appendChild(li);
+  });
+}
+
+// AGREGAR
+function add(p){
+  carrito.push(p);
+  render();
+}
+
+// RENDER
+function render(){
+  const lista=document.getElementById("carrito");
+  lista.innerHTML="";
+  let total=0;
+
+  carrito.forEach(p=>{
+    const li=document.createElement("li");
+    li.innerText=p.nombre+" $"+p.precio;
+    lista.appendChild(li);
+    total+=p.precio;
+  });
+
+  document.getElementById("total").innerText=total;
+  cambioCalc();
+}
+
+// CAMBIO
+function cambioCalc(){
+  const total = Number(document.getElementById("total").innerText);
+  const recibido = Number(document.getElementById("monto").value || 0);
+  document.getElementById("cambio").innerText = recibido-total;
+}
+
+// VENTA
+async function vender(){
+  for(const p of carrito){
+    await fetch(API+"/movimientos/",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        Authorization:"Bearer "+localStorage.getItem("token")
+      },
+      body: JSON.stringify({
+        producto_id:p.id,
+        tipo:"salida",
+        cantidad:1,
+        usuario:"POS"
+      })
+    });
+  }
+  alert("Venta hecha");
+  carrito=[];
+  render();
+}
+</script>
+
 </body>
 </html>
