@@ -6,46 +6,105 @@
   <title>Mexa POS</title>
 
   <style>
-    body { font-family: Arial; background:#f4f6f8; padding:20px; }
-    .card { background:white; padding:15px; margin-bottom:15px; border-radius:10px; }
-    input, button, select { width:100%; padding:10px; margin-bottom:10px; }
-    ul { list-style:none; padding:0; }
-    li { background:#eee; padding:8px; margin-bottom:5px; cursor:pointer; }
-    .danger { background:red; color:white; }
+    body { font-family: Arial, sans-serif; background: #f4f6f8; padding: 20px; margin: 0; }
+    h1 { margin-top: 0; }
+    .card {
+      background: white;
+      padding: 16px;
+      margin-bottom: 16px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+    input, button, select {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    li {
+      background: #eee;
+      padding: 10px;
+      margin-bottom: 6px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    li:hover {
+      background: #ddd;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .danger {
+      background: #b91c1c;
+      color: white;
+      border: none;
+    }
+    .ok {
+      color: #166534;
+      font-weight: bold;
+    }
+    .muted {
+      color: #555;
+    }
+    @media (max-width: 800px) {
+      .row {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
 
 <h1>Mexa POS</h1>
 
-<div class="card">
-  <h3>Login</h3>
-  <input id="email" placeholder="Correo"/>
-  <input id="password" type="password" placeholder="Contraseña"/>
-  <button onclick="login()">Login</button>
-  <p id="loginEstado"></p>
+<div class="row">
+  <div class="card">
+    <h3>Login</h3>
+    <input id="email" placeholder="Correo" />
+    <input id="password" type="password" placeholder="Contraseña" />
+    <button onclick="login()">Login</button>
+    <p id="loginEstado" class="muted"></p>
+  </div>
+
+  <div class="card">
+    <h3>Búsqueda rápida</h3>
+    <input id="busqueda" placeholder="Buscar por código, clave o descripción..." oninput="buscar()" />
+    <ul id="resultados"></ul>
+  </div>
 </div>
 
-<div class="card">
-  <h3>Búsqueda</h3>
-  <input id="busqueda" placeholder="Buscar producto..." oninput="buscar()"/>
-  <ul id="resultados"></ul>
-</div>
+<div class="row">
+  <div class="card">
+    <h3>Productos cargados</h3>
+    <button onclick="cargarProductos()">Recargar productos</button>
+    <ul id="listaProductos"></ul>
+  </div>
 
-<div class="card">
-  <h3>Carrito</h3>
-  <ul id="carrito"></ul>
-  <p>Total: $<span id="total">0</span></p>
+  <div class="card">
+    <h3>Carrito</h3>
+    <ul id="carrito"></ul>
+    <p><strong>Total:</strong> $<span id="total">0.00</span></p>
 
-  <select id="formaPago">
-    <option value="efectivo">Efectivo</option>
-    <option value="tarjeta">Tarjeta</option>
-  </select>
+    <select id="formaPago">
+      <option value="efectivo">Efectivo</option>
+      <option value="tarjeta">Tarjeta</option>
+      <option value="transferencia">Transferencia</option>
+    </select>
 
-  <input id="monto" placeholder="Recibido" oninput="cambioCalc()"/>
-  <p>Cambio: $<span id="cambio">0</span></p>
+    <input id="monto" type="number" placeholder="Monto recibido" oninput="cambioCalc()" />
+    <p><strong>Cambio:</strong> $<span id="cambio">0.00</span></p>
 
-  <button onclick="vender()">Vender</button>
+    <button onclick="vender()">Vender</button>
+    <button class="danger" onclick="vaciarCarrito()">Vaciar carrito</button>
+    <p id="ventaEstado" class="muted"></p>
+  </div>
 </div>
 
 <script>
@@ -53,105 +112,267 @@ const API = "https://mexa-core-1.onrender.com";
 let productos = [];
 let carrito = [];
 
-// LOGIN (CORREGIDO JSON)
-async function login(){
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
+async function login() {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value.trim();
   const estado = document.getElementById("loginEstado");
 
-  const res = await fetch(API + "/auth/auth/login", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ email, password })
-  });
+  estado.innerText = "Iniciando sesión...";
 
-  const data = await res.json();
-  console.log(data);
+  try {
+    const res = await fetch(API + "/auth/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
 
-  if(res.ok){
-    localStorage.setItem("token", data.access_token);
-    estado.innerText = "Login OK";
-    cargarProductos();
-  } else {
-    estado.innerText = data.detail;
+    const data = await res.json();
+    console.log("LOGIN RESPONSE:", data);
+
+    if (res.ok && data.access_token) {
+      localStorage.setItem("token", data.access_token);
+      estado.innerText = "Login OK";
+      estado.className = "ok";
+      await cargarProductos();
+    } else {
+      estado.innerText = data.detail || "Error en login";
+      estado.className = "muted";
+    }
+  } catch (error) {
+    console.error(error);
+    estado.innerText = "Error de conexión con backend";
+    estado.className = "muted";
   }
 }
 
-// CARGAR PRODUCTOS
-async function cargarProductos(){
-  const res = await fetch(API + "/productos/productos/", {
-    headers:{ Authorization:"Bearer "+localStorage.getItem("token") }
-  });
-  productos = await res.json();
+async function cargarProductos() {
+  const token = localStorage.getItem("token");
+  const lista = document.getElementById("listaProductos");
+
+  if (!token) {
+    lista.innerHTML = "<li>Primero inicia sesión</li>";
+    return;
+  }
+
+  lista.innerHTML = "<li>Cargando productos...</li>";
+
+  try {
+    const res = await fetch(API + "/productos/productos/", {
+      headers: {
+        Authorization: "Bearer " + token
+      }
+    });
+
+    const data = await res.json();
+    console.log("PRODUCTOS:", data);
+
+    if (!res.ok) {
+      lista.innerHTML = "<li>Error cargando productos</li>";
+      return;
+    }
+
+    productos = Array.isArray(data) ? data : [];
+    renderProductos();
+  } catch (error) {
+    console.error(error);
+    lista.innerHTML = "<li>Error de conexión</li>";
+  }
 }
 
-// BUSCAR
-function buscar(){
-  const texto = document.getElementById("busqueda").value.toLowerCase();
+function renderProductos() {
+  const lista = document.getElementById("listaProductos");
+  lista.innerHTML = "";
+
+  if (productos.length === 0) {
+    lista.innerHTML = "<li>No hay productos</li>";
+    return;
+  }
+
+  productos.forEach(p => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <strong>${p.nombre}</strong><br>
+      Código: ${p.codigo || "-"}<br>
+      Precio: $${Number(p.precio || 0).toFixed(2)}<br>
+      Stock: ${p.cantidad ?? 0}
+    `;
+    li.onclick = () => add(p);
+    lista.appendChild(li);
+  });
+}
+
+function buscar() {
+  const texto = document.getElementById("busqueda").value.trim().toLowerCase();
   const lista = document.getElementById("resultados");
-  lista.innerHTML="";
+  lista.innerHTML = "";
 
-  productos.filter(p =>
-    p.nombre.toLowerCase().includes(texto) ||
-    (p.codigo && p.codigo.toLowerCase().includes(texto))
-  ).forEach(p=>{
-    const li=document.createElement("li");
-    li.innerText=p.nombre+" $"+p.precio;
-    li.onclick=()=>add(p);
+  if (!texto) return;
+
+  const filtrados = productos.filter(p => {
+    const nombre = (p.nombre || "").toLowerCase();
+    const codigo = (p.codigo || "").toLowerCase();
+    const descripcion = (p.descripcion || "").toLowerCase();
+
+    return (
+      nombre.includes(texto) ||
+      codigo.includes(texto) ||
+      descripcion.includes(texto)
+    );
+  });
+
+  if (filtrados.length === 0) {
+    lista.innerHTML = "<li>No se encontraron productos</li>";
+    return;
+  }
+
+  filtrados.slice(0, 20).forEach(p => {
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <strong>${p.nombre}</strong><br>
+      Código: ${p.codigo || "-"} | $${Number(p.precio || 0).toFixed(2)}
+    `;
+    li.onclick = () => {
+      add(p);
+      document.getElementById("busqueda").value = "";
+      lista.innerHTML = "";
+    };
     lista.appendChild(li);
   });
 }
 
-// AGREGAR
-function add(p){
-  carrito.push(p);
-  render();
+function add(p) {
+  const encontrado = carrito.find(item => item.id === p.id);
+
+  if (encontrado) {
+    encontrado.cantidad += 1;
+  } else {
+    carrito.push({
+      id: p.id,
+      nombre: p.nombre,
+      codigo: p.codigo || "",
+      precio: Number(p.precio || 0),
+      cantidad: 1
+    });
+  }
+
+  renderCarrito();
 }
 
-// RENDER
-function render(){
-  const lista=document.getElementById("carrito");
-  lista.innerHTML="";
-  let total=0;
+function renderCarrito() {
+  const lista = document.getElementById("carrito");
+  lista.innerHTML = "";
 
-  carrito.forEach(p=>{
-    const li=document.createElement("li");
-    li.innerText=p.nombre+" $"+p.precio;
+  if (carrito.length === 0) {
+    lista.innerHTML = "<li>Carrito vacío</li>";
+  }
+
+  carrito.forEach(item => {
+    const subtotal = item.precio * item.cantidad;
+
+    const li = document.createElement("li");
+    li.innerHTML = `
+      <strong>${item.nombre}</strong><br>
+      Código: ${item.codigo || "-"}<br>
+      ${item.cantidad} x $${item.precio.toFixed(2)} = $${subtotal.toFixed(2)}
+      <br><br>
+      <button onclick="sumar(${item.id})">+1</button>
+      <button onclick="restar(${item.id})">-1</button>
+      <button class="danger" onclick="quitar(${item.id})">Quitar</button>
+    `;
     lista.appendChild(li);
-    total+=p.precio;
   });
 
-  document.getElementById("total").innerText=total;
+  const total = carrito.reduce((acc, item) => acc + item.precio * item.cantidad, 0);
+  document.getElementById("total").innerText = total.toFixed(2);
   cambioCalc();
 }
 
-// CAMBIO
-function cambioCalc(){
-  const total = Number(document.getElementById("total").innerText);
-  const recibido = Number(document.getElementById("monto").value || 0);
-  document.getElementById("cambio").innerText = recibido-total;
+function sumar(id) {
+  const item = carrito.find(p => p.id === id);
+  if (item) {
+    item.cantidad += 1;
+    renderCarrito();
+  }
 }
 
-// VENTA
-async function vender(){
-  for(const p of carrito){
-    await fetch(API+"/movimientos/",{
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        Authorization:"Bearer "+localStorage.getItem("token")
-      },
-      body: JSON.stringify({
-        producto_id:p.id,
-        tipo:"salida",
-        cantidad:1,
-        usuario:"POS"
-      })
-    });
+function restar(id) {
+  const item = carrito.find(p => p.id === id);
+  if (item) {
+    item.cantidad -= 1;
+    if (item.cantidad <= 0) {
+      carrito = carrito.filter(p => p.id !== id);
+    }
+    renderCarrito();
   }
-  alert("Venta hecha");
-  carrito=[];
-  render();
+}
+
+function quitar(id) {
+  carrito = carrito.filter(p => p.id !== id);
+  renderCarrito();
+}
+
+function vaciarCarrito() {
+  carrito = [];
+  renderCarrito();
+  document.getElementById("ventaEstado").innerText = "";
+}
+
+function cambioCalc() {
+  const total = Number(document.getElementById("total").innerText || 0);
+  const recibido = Number(document.getElementById("monto").value || 0);
+  const cambio = recibido - total;
+  document.getElementById("cambio").innerText = cambio > 0 ? cambio.toFixed(2) : "0.00";
+}
+
+async function vender() {
+  const token = localStorage.getItem("token");
+  const estado = document.getElementById("ventaEstado");
+
+  if (!token) {
+    estado.innerText = "Primero inicia sesión";
+    return;
+  }
+
+  if (carrito.length === 0) {
+    estado.innerText = "El carrito está vacío";
+    return;
+  }
+
+  estado.innerText = "Registrando venta...";
+
+  try {
+    for (const p of carrito) {
+      const res = await fetch(API + "/movimientos/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token
+        },
+        body: JSON.stringify({
+          producto_id: p.id,
+          tipo: "salida",
+          cantidad: p.cantidad,
+          usuario: "POS"
+        })
+      });
+
+      const data = await res.json();
+      console.log("MOVIMIENTO:", data);
+
+      if (!res.ok) {
+        estado.innerText = data.detail || "Error en venta";
+        return;
+      }
+    }
+
+    estado.innerText = "Venta registrada correctamente";
+    carrito = [];
+    renderCarrito();
+    await cargarProductos();
+  } catch (error) {
+    console.error(error);
+    estado.innerText = "Error de conexión al vender";
+  }
 }
 </script>
 
