@@ -1,956 +1,640 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mexa POS - Ticket</title>
+  <title>Mexa POS</title>
   <style>
+    :root {
+      --bg: #f4f6f8;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #d1d5db;
+      --header: #f9fafb;
+      --button: #111827;
+      --button-hover: #000000;
+      --ok: #166534;
+      --error: #b91c1c;
+      --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      --radius: 12px;
+    }
+
     * {
       box-sizing: border-box;
     }
 
     body {
       margin: 0;
+      padding: 24px;
       font-family: Arial, sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
-    }
-
-    .wrap {
-      max-width: 1500px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 20px;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
+      background: var(--bg);
+      color: var(--text);
     }
 
     h1, h2, h3 {
       margin-top: 0;
     }
 
-    .small {
-      font-size: 12px;
-      color: #94a3b8;
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
     }
 
-    .status {
-      padding: 10px 14px;
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      padding: 8px 12px;
       border-radius: 999px;
-      background: #1e293b;
-      border: 1px solid #334155;
-      font-size: 13px;
+      background: #e5e7eb;
+      font-size: 14px;
     }
 
     .grid {
       display: grid;
-      grid-template-columns: 340px 1fr 380px 360px;
+      grid-template-columns: 1fr 1fr;
       gap: 20px;
     }
 
     .card {
-      background: #111827;
-      border: 1px solid #1f2937;
-      border-radius: 14px;
-      padding: 18px;
-      box-shadow: 0 8px 20px rgba(0,0,0,.25);
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      overflow: hidden;
     }
 
-    label {
-      display: block;
-      margin: 10px 0 6px;
-      font-size: 14px;
-      color: #cbd5e1;
+    .card-header {
+      background: var(--header);
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: bold;
     }
 
-    input, select, button {
+    .card-body {
+      padding: 16px;
+    }
+
+    input, select, button, textarea {
       width: 100%;
       padding: 12px;
+      border: 1px solid var(--border);
       border-radius: 10px;
-      border: 1px solid #334155;
-      background: #0b1220;
-      color: #e2e8f0;
       font-size: 14px;
+      margin-bottom: 12px;
     }
 
     button {
+      background: var(--button);
+      color: white;
+      border: none;
       cursor: pointer;
       font-weight: bold;
-      border: none;
-      background: #2563eb;
-      transition: .2s;
     }
 
     button:hover {
-      opacity: .92;
-    }
-
-    button.secondary {
-      background: #374151;
-    }
-
-    button.danger {
-      background: #dc2626;
-    }
-
-    button.success {
-      background: #16a34a;
+      background: var(--button-hover);
     }
 
     .row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 12px;
     }
 
-    .mt-10 { margin-top: 10px; }
-    .mt-16 { margin-top: 16px; }
-    .mt-20 { margin-top: 20px; }
+    .productos-lista,
+    .resultados-lista,
+    .carrito-lista {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
 
-    .msg {
-      margin-top: 12px;
-      padding: 12px;
+    .productos-lista li,
+    .resultados-lista li,
+    .carrito-lista li {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
       border-radius: 10px;
-      font-size: 14px;
-      display: none;
-      white-space: pre-wrap;
-      word-break: break-word;
+      margin-bottom: 8px;
+      background: white;
     }
 
-    .msg.ok {
-      display: block;
-      background: rgba(22, 163, 74, 0.15);
-      border: 1px solid rgba(22, 163, 74, 0.45);
-      color: #bbf7d0;
+    .resultados-lista li {
+      cursor: pointer;
     }
 
-    .msg.err {
-      display: block;
-      background: rgba(220, 38, 38, 0.15);
-      border: 1px solid rgba(220, 38, 38, 0.45);
-      color: #fecaca;
+    .resultados-lista li:hover {
+      background: #f3f4f6;
     }
 
-    .toolbar {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-bottom: 14px;
-    }
-
-    .toolbar input {
-      flex: 1;
-      min-width: 220px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      overflow: hidden;
-      border-radius: 12px;
-    }
-
-    thead {
-      background: #1e293b;
-    }
-
-    th, td {
-      padding: 12px;
-      border-bottom: 1px solid #1f2937;
-      text-align: left;
-      font-size: 14px;
-      vertical-align: top;
-    }
-
-    tr:hover td {
-      background: rgba(255,255,255,0.02);
-    }
-
-    .pill {
-      display: inline-block;
-      padding: 5px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: bold;
-    }
-
-    .pill.low {
-      background: rgba(220, 38, 38, 0.18);
-      color: #fecaca;
-    }
-
-    .pill.ok {
-      background: rgba(34, 197, 94, 0.18);
-      color: #bbf7d0;
-    }
-
-    .carrito-item,
-    .ticket-item {
-      border: 1px solid #334155;
-      background: #0b1220;
-      border-radius: 12px;
-      padding: 12px;
-      margin-bottom: 10px;
-    }
-
-    .carrito-top {
+    .carrito-item {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       gap: 10px;
-      align-items: start;
+      flex-wrap: wrap;
     }
 
-    .carrito-name,
-    .ticket-name {
-      font-weight: bold;
-      margin-bottom: 6px;
-    }
-
-    .carrito-sub,
-    .ticket-sub {
-      font-size: 13px;
-      color: #94a3b8;
-    }
-
-    .btn-mini {
+    .mini-btn {
       width: auto;
-      padding: 8px 12px;
-      border-radius: 8px;
+      margin: 0;
+      padding: 8px 10px;
       font-size: 12px;
-      background: #dc2626;
+      border-radius: 8px;
+    }
+
+    .danger {
+      background: var(--error);
+    }
+
+    .success {
+      color: var(--ok);
+      font-weight: bold;
+    }
+
+    .error {
+      color: var(--error);
+      font-weight: bold;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .ticket {
+      background: #fff;
+      border: 1px dashed #9ca3af;
+      padding: 16px;
+      border-radius: 10px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      min-height: 240px;
     }
 
     .total-box {
-      margin-top: 16px;
-      padding: 16px;
-      border-radius: 12px;
-      background: #0b1220;
-      border: 1px solid #334155;
-    }
-
-    .total-line {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 14px;
-    }
-
-    .total-final {
-      display: flex;
-      justify-content: space-between;
       font-size: 22px;
       font-weight: bold;
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid #334155;
-    }
-
-    .ticket-box {
-      background: #0b1220;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      padding: 14px;
-    }
-
-    .ticket-header {
-      text-align: center;
-      border-bottom: 1px dashed #475569;
-      padding-bottom: 12px;
       margin-bottom: 12px;
     }
 
-    .ticket-title {
-      font-size: 20px;
-      font-weight: bold;
+    .hidden {
+      display: none;
     }
 
-    .ticket-meta {
-      font-size: 13px;
-      color: #94a3b8;
-      margin-top: 4px;
-    }
-
-    .ticket-total {
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px dashed #475569;
-      font-size: 22px;
-      font-weight: bold;
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .ticket-empty {
-      font-size: 13px;
-      color: #94a3b8;
-    }
-
-    @media (max-width: 1450px) {
+    @media (max-width: 900px) {
       .grid {
         grid-template-columns: 1fr;
       }
-    }
 
-    @media print {
-      body {
-        background: white;
-        color: black;
-      }
-
-      .no-print {
-        display: none !important;
-      }
-
-      .print-ticket-only .card,
-      .print-ticket-only .header {
-        display: none !important;
-      }
-
-      .print-ticket-only #ticketCard {
-        display: block !important;
-        border: none;
-        box-shadow: none;
-        background: white;
-        color: black;
-      }
-
-      .print-ticket-only .ticket-box,
-      .print-ticket-only .ticket-item {
-        border: 1px solid #ccc;
-        background: white;
-        color: black;
-      }
-
-      .print-ticket-only .ticket-meta,
-      .print-ticket-only .ticket-sub {
-        color: #333 !important;
+      .row {
+        grid-template-columns: 1fr;
       }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="header no-print">
+    <div class="topbar">
+      <h1>Mexa POS</h1>
       <div>
-        <h1>Mexa POS</h1>
-        <div class="small">POS con carrito, total y ticket simple</div>
+        <span class="badge" id="estadoSesion">Sin sesión</span>
       </div>
-      <div class="status" id="sessionStatus">Sin sesión</div>
     </div>
 
     <div class="grid">
-      <div class="card no-print">
-        <h2>1) Configuración</h2>
-
-        <label for="apiBase">Base URL API</label>
-        <input id="apiBase" value="https://mexa-core-1.onrender.com" />
-
-        <label for="organizacionId">Organización ID</label>
-        <input id="organizacionId" type="number" placeholder="Ej. 1" value="1" />
-
-        <label for="usuarioMovimiento">Usuario que vende</label>
-        <input id="usuarioMovimiento" placeholder="Ej. Alfredo" value="Alfredo" />
-
-        <div class="small mt-10">
-          Este valor se manda como responsable del movimiento.
-        </div>
-
-        <div class="card mt-20" style="padding:0; border:none; box-shadow:none; background:transparent;">
-          <h2>2) Login</h2>
-
-          <label for="email">Email</label>
-          <input id="email" type="email" placeholder="admin2@mexa.com" value="admin2@mexa.com" />
-
-          <label for="password">Password</label>
-          <input id="password" type="password" placeholder="123456" value="123456" />
-
-          <div class="row mt-16">
-            <button onclick="login()">Iniciar sesión</button>
-            <button class="secondary" onclick="loadFromStorage()">Cargar guardado</button>
-          </div>
-
-          <button class="danger mt-10" onclick="logout()">Cerrar sesión</button>
-
-          <div id="loginMsg" class="msg"></div>
+      <!-- LOGIN -->
+      <div class="card">
+        <div class="card-header">Login</div>
+        <div class="card-body">
+          <input type="email" id="email" placeholder="Correo" />
+          <input type="password" id="password" placeholder="Contraseña" />
+          <button onclick="login()">Iniciar sesión</button>
+          <button onclick="logout()" class="danger">Cerrar sesión</button>
+          <p id="loginEstado" class="muted"></p>
         </div>
       </div>
 
-      <div class="card no-print">
-        <h2>Inventario</h2>
-
-        <div class="toolbar">
-          <input id="searchInput" placeholder="Buscar por nombre o código..." oninput="renderProductos()" />
-          <button style="max-width: 180px;" onclick="cargarProductos()">Refrescar inventario</button>
-        </div>
-
-        <div style="overflow:auto;">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Código</th>
-                <th>Nombre</th>
-                <th>Precio</th>
-                <th>Stock</th>
-                <th>Tipo</th>
-              </tr>
-            </thead>
-            <tbody id="productosTable">
-              <tr>
-                <td colspan="6">Sin datos todavía.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="small mt-10">
-          Haz clic en un producto de la tabla para seleccionarlo arriba.
+      <!-- BÚSQUEDA -->
+      <div class="card">
+        <div class="card-header">Búsqueda rápida</div>
+        <div class="card-body">
+          <input
+            type="text"
+            id="busqueda"
+            placeholder="Buscar por código, clave o descripción..."
+            oninput="buscarProductos()"
+          />
+          <ul id="resultados" class="resultados-lista"></ul>
         </div>
       </div>
 
-      <div class="card no-print">
-        <h2>Agregar al carrito</h2>
-
-        <label for="productoSelect">Producto</label>
-        <select id="productoSelect">
-          <option value="">Primero carga productos</option>
-        </select>
-
-        <label for="cantidadVenta">Cantidad</label>
-        <input id="cantidadVenta" type="number" min="1" value="1" />
-
-        <label for="notaVenta">Nota general</label>
-        <input id="notaVenta" placeholder="Venta mostrador / ticket / observación" value="Venta POS Woppy" />
-
-        <button class="mt-16" onclick="agregarCarrito()">Agregar al carrito</button>
-
-        <div id="ventaMsg" class="msg"></div>
-
-        <h2 class="mt-20">Carrito</h2>
-
-        <div id="carritoLista">
-          <div class="small">El carrito está vacío.</div>
+      <!-- PRODUCTOS -->
+      <div class="card">
+        <div class="card-header">Productos</div>
+        <div class="card-body">
+          <button onclick="cargarProductos()">Cargar productos</button>
+          <ul id="listaProductos" class="productos-lista"></ul>
         </div>
-
-        <div class="total-box">
-          <div class="total-line">
-            <span>Items</span>
-            <span id="totalItems">0</span>
-          </div>
-          <div class="total-final">
-            <span>Total</span>
-            <span>$<span id="totalGeneral">0.00</span></span>
-          </div>
-        </div>
-
-        <div class="row mt-16">
-          <button class="danger" onclick="vaciarCarrito()">Vaciar carrito</button>
-          <button class="success" onclick="finalizarVenta()">Finalizar venta</button>
-        </div>
-
-        <div id="carritoMsg" class="msg"></div>
       </div>
 
-      <div class="card" id="ticketCard">
-        <h2>Ticket</h2>
+      <!-- CARRITO -->
+      <div class="card">
+        <div class="card-header">Carrito / Cobro</div>
+        <div class="card-body">
+          <ul id="carrito" class="carrito-lista"></ul>
 
-        <div class="ticket-box" id="ticketBox">
-          <div class="ticket-header">
-            <div class="ticket-title">WOPPY</div>
-            <div class="ticket-meta">Mexa POS</div>
-            <div class="ticket-meta" id="ticketFecha">Sin venta todavía</div>
-            <div class="ticket-meta" id="ticketUsuario">Usuario: -</div>
-          </div>
+          <div class="total-box">Total: $<span id="total">0.00</span></div>
 
-          <div id="ticketItems">
-            <div class="ticket-empty">Todavía no hay ticket generado.</div>
-          </div>
+          <select id="formaPago">
+            <option value="efectivo">Efectivo</option>
+            <option value="tarjeta">Tarjeta</option>
+            <option value="transferencia">Transferencia</option>
+          </select>
 
-          <div class="ticket-total">
-            <span>Total</span>
-            <span>$<span id="ticketTotal">0.00</span></span>
-          </div>
+          <input
+            type="number"
+            id="montoRecibido"
+            placeholder="Monto recibido"
+            oninput="calcularCambio()"
+          />
+
+          <p><strong>Cambio:</strong> $<span id="cambio">0.00</span></p>
+
+          <button onclick="registrarVenta()">Registrar venta</button>
+          <button onclick="vaciarCarrito()" class="danger">Vaciar carrito</button>
+
+          <p id="ventaEstado" class="muted"></p>
         </div>
+      </div>
 
-        <button class="secondary mt-16 no-print" onclick="imprimirTicket()">Imprimir ticket</button>
+      <!-- TICKET -->
+      <div class="card" style="grid-column: 1 / -1;">
+        <div class="card-header">Ticket</div>
+        <div class="card-body">
+          <div class="ticket" id="ticketPreview">Aquí aparecerá el ticket...</div>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
-    let token = localStorage.getItem("mexa_token") || "";
-    let productos = [];
+    const API_URL = "https://mexa-core-1.onrender.com";
+
+    let productosCache = [];
     let carrito = [];
-    let ultimoTicket = null;
 
-    function getEl(id) {
-      return document.getElementById(id);
-    }
-
-    function showMsg(id, text, ok = true) {
-      const el = getEl(id);
-      el.className = "msg " + (ok ? "ok" : "err");
-      el.textContent = text;
-    }
-
-    function clearMsg(id) {
-      const el = getEl(id);
-      el.className = "msg";
-      el.textContent = "";
-    }
-
-    function getConfig() {
-      return {
-        apiBase: getEl("apiBase").value.trim().replace(/\/$/, ""),
-        organizacionId: Number(getEl("organizacionId").value),
-        usuarioMovimiento: getEl("usuarioMovimiento").value.trim()
-      };
-    }
-
-    function saveConfig() {
-      const cfg = {
-        apiBase: getEl("apiBase").value.trim(),
-        organizacionId: getEl("organizacionId").value.trim(),
-        usuarioMovimiento: getEl("usuarioMovimiento").value.trim(),
-        email: getEl("email").value.trim()
-      };
-      localStorage.setItem("mexa_cfg", JSON.stringify(cfg));
-    }
-
-    function loadFromStorage() {
-      const raw = localStorage.getItem("mexa_cfg");
-
-      if (raw) {
-        try {
-          const cfg = JSON.parse(raw);
-          getEl("apiBase").value = cfg.apiBase || "https://mexa-core-1.onrender.com";
-          getEl("organizacionId").value = cfg.organizacionId || "1";
-          getEl("usuarioMovimiento").value = cfg.usuarioMovimiento || "Alfredo";
-          getEl("email").value = cfg.email || "admin2@mexa.com";
-        } catch (e) {
-          console.error("Error leyendo config guardada:", e);
-        }
-      }
-
-      token = localStorage.getItem("mexa_token") || "";
-      updateSessionStatus();
-    }
-
-    function updateSessionStatus() {
-      const el = getEl("sessionStatus");
-      if (token) {
-        el.textContent = "Sesión activa";
-        el.style.color = "#bbf7d0";
-      } else {
-        el.textContent = "Sin sesión";
-        el.style.color = "#fecaca";
-      }
+    function actualizarEstadoSesion() {
+      const token = localStorage.getItem("mexa_token");
+      const estado = document.getElementById("estadoSesion");
+      estado.textContent = token ? "Sesión activa" : "Sin sesión";
+      estado.style.background = token ? "#dcfce7" : "#e5e7eb";
     }
 
     async function login() {
-      clearMsg("loginMsg");
-      clearMsg("ventaMsg");
-      clearMsg("carritoMsg");
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const estado = document.getElementById("loginEstado");
 
-      const { apiBase } = getConfig();
-      const email = getEl("email").value.trim();
-      const password = getEl("password").value.trim();
-
-      if (!email || !password) {
-        showMsg("loginMsg", "Faltan email o password.", false);
-        return;
-      }
+      estado.className = "muted";
+      estado.textContent = "Iniciando sesión...";
 
       try {
-        const res = await fetch(`${apiBase}/auth/auth/login`, {
+        const res = await fetch(`${API_URL}/auth/auth/login`, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
-            "accept": "application/json"
+            "Content-Type": "application/x-www-form-urlencoded"
           },
-          body: JSON.stringify({ email, password })
+          body: new URLSearchParams({
+            username: email,
+            password: password
+          })
         });
 
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json();
+        console.log("LOGIN RESPONSE:", data);
 
-        if (!res.ok) {
-          showMsg("loginMsg", "Error de login:\n" + JSON.stringify(data, null, 2), false);
+        if (!res.ok || !data.access_token) {
+          estado.className = "error";
+          estado.textContent = data.detail || "No se pudo iniciar sesión";
           return;
         }
 
-        token = data.access_token || data.token || "";
-
-        if (!token) {
-          showMsg("loginMsg", "Login correcto, pero no vino token.", false);
-          return;
-        }
-
-        localStorage.setItem("mexa_token", token);
-        saveConfig();
-        updateSessionStatus();
-        showMsg("loginMsg", "Login correcto.");
+        localStorage.setItem("mexa_token", data.access_token);
+        estado.className = "success";
+        estado.textContent = "Login correcto";
+        actualizarEstadoSesion();
       } catch (error) {
-        showMsg("loginMsg", "Error de conexión:\n" + error.message, false);
+        console.error(error);
+        estado.className = "error";
+        estado.textContent = "Error de conexión con backend";
       }
     }
 
     function logout() {
-      token = "";
-      productos = [];
-      carrito = [];
       localStorage.removeItem("mexa_token");
-      updateSessionStatus();
+      actualizarEstadoSesion();
+      document.getElementById("loginEstado").className = "muted";
+      document.getElementById("loginEstado").textContent = "Sesión cerrada";
+    }
 
-      getEl("productoSelect").innerHTML = '<option value="">Primero carga productos</option>';
-      getEl("productosTable").innerHTML = '<tr><td colspan="6">Sin datos todavía.</td></tr>';
-
-      renderCarrito();
-
-      showMsg("loginMsg", "Sesión cerrada.");
-      clearMsg("ventaMsg");
-      clearMsg("carritoMsg");
+    function getToken() {
+      return localStorage.getItem("mexa_token");
     }
 
     async function cargarProductos() {
-      clearMsg("ventaMsg");
-      clearMsg("loginMsg");
-
-      const { apiBase } = getConfig();
+      const token = getToken();
+      const lista = document.getElementById("listaProductos");
+      lista.innerHTML = "<li>Cargando...</li>";
 
       if (!token) {
-        showMsg("loginMsg", "Primero inicia sesión.", false);
+        lista.innerHTML = "<li class='error'>Primero inicia sesión</li>";
         return;
       }
 
       try {
-        const res = await fetch(`${apiBase}/productos/productos/`, {
-          method: "GET",
+        const res = await fetch(`${API_URL}/productos/productos/`, {
           headers: {
-            "accept": "application/json",
             "Authorization": `Bearer ${token}`
           }
         });
 
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json();
+        console.log("PRODUCTOS RESPONSE:", data);
 
         if (!res.ok) {
-          showMsg("loginMsg", "No se pudieron cargar productos:\n" + JSON.stringify(data, null, 2), false);
+          lista.innerHTML = `<li class="error">${data.detail || "Error al cargar productos"}</li>`;
           return;
         }
 
-        productos = Array.isArray(data) ? data : [];
-        fillProductoSelect();
-        renderProductos();
+        productosCache = Array.isArray(data) ? data : [];
 
-        if (productos.length === 0) {
-          showMsg("loginMsg", "Sesión activa, pero no hay productos cargados todavía.");
+        if (productosCache.length === 0) {
+          lista.innerHTML = "<li>No hay productos</li>";
+          return;
         }
-      } catch (error) {
-        showMsg("loginMsg", "Error cargando productos:\n" + error.message, false);
-      }
-    }
 
-    function fillProductoSelect() {
-      const select = getEl("productoSelect");
-      select.innerHTML = "";
-
-      if (!productos.length) {
-        select.innerHTML = '<option value="">No hay productos</option>';
-        return;
-      }
-
-      productos.forEach((p) => {
-        const precio = Number(p.precio || 0).toFixed(2);
-        const option = document.createElement("option");
-        option.value = p.id;
-        option.textContent = `${p.nombre || "Sin nombre"} (${p.codigo || "Sin código"}) - $${precio} - Stock: ${p.cantidad ?? 0}`;
-        select.appendChild(option);
-      });
-    }
-
-    function renderProductos() {
-      const tbody = getEl("productosTable");
-      const q = getEl("searchInput").value.trim().toLowerCase();
-      tbody.innerHTML = "";
-
-      const filtrados = productos.filter((p) => {
-        const nombre = String(p.nombre || "").toLowerCase();
-        const codigo = String(p.codigo || "").toLowerCase();
-        return nombre.includes(q) || codigo.includes(q);
-      });
-
-      if (!filtrados.length) {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="6">No hay productos para mostrar.</td>
-          </tr>
-        `;
-        return;
-      }
-
-      for (const p of filtrados) {
-        const tr = document.createElement("tr");
-        const stock = Number(p.cantidad || 0);
-        const precio = Number(p.precio || 0).toFixed(2);
-
-        tr.innerHTML = `
-          <td>${p.id ?? ""}</td>
-          <td>${p.codigo ?? ""}</td>
-          <td>${p.nombre ?? ""}</td>
-          <td>$${precio}</td>
-          <td><span class="pill ${stock <= 5 ? "low" : "ok"}">${stock}</span></td>
-          <td>${p.tipo ?? ""}</td>
-        `;
-
-        tr.addEventListener("click", () => {
-          getEl("productoSelect").value = String(p.id);
+        lista.innerHTML = "";
+        productosCache.forEach((p) => {
+          const li = document.createElement("li");
+          li.innerHTML = `
+            <strong>${p.nombre || "Sin nombre"}</strong><br>
+            Código: ${p.codigo || "-"}<br>
+            Precio: $${Number(p.precio || 0).toFixed(2)}<br>
+            Stock: ${p.cantidad ?? 0}
+            <br><br>
+            <button class="mini-btn" onclick="agregarAlCarritoPorId(${p.id})">Agregar</button>
+          `;
+          lista.appendChild(li);
         });
-
-        tbody.appendChild(tr);
+      } catch (error) {
+        console.error(error);
+        lista.innerHTML = "<li class='error'>Error de conexión</li>";
       }
     }
 
-    function agregarCarrito() {
-      clearMsg("ventaMsg");
-      clearMsg("carritoMsg");
+    function buscarProductos() {
+      const texto = document.getElementById("busqueda").value.trim().toLowerCase();
+      const resultados = document.getElementById("resultados");
 
-      const productoId = Number(getEl("productoSelect").value);
-      const cantidad = Number(getEl("cantidadVenta").value);
-
-      if (!productoId) {
-        showMsg("ventaMsg", "Selecciona un producto.", false);
+      if (!productosCache.length) {
+        resultados.innerHTML = "<li>Carga productos primero</li>";
         return;
       }
 
-      if (!cantidad || cantidad <= 0) {
-        showMsg("ventaMsg", "La cantidad debe ser mayor a 0.", false);
+      if (texto.length === 0) {
+        resultados.innerHTML = "";
         return;
       }
 
-      const producto = productos.find(p => Number(p.id) === productoId);
+      const filtrados = productosCache.filter((p) => {
+        const nombre = (p.nombre || "").toLowerCase();
+        const codigo = (p.codigo || "").toLowerCase();
+        const descripcion = (p.descripcion || "").toLowerCase();
+        return (
+          nombre.includes(texto) ||
+          codigo.includes(texto) ||
+          descripcion.includes(texto)
+        );
+      });
 
-      if (!producto) {
-        showMsg("ventaMsg", "No se encontró el producto seleccionado.", false);
+      resultados.innerHTML = "";
+
+      if (filtrados.length === 0) {
+        resultados.innerHTML = "<li>No se encontraron productos</li>";
         return;
       }
 
-      const stockActual = Number(producto.cantidad || 0);
-      if (cantidad > stockActual) {
-        showMsg("ventaMsg", `No hay suficiente stock. Disponible: ${stockActual}`, false);
-        return;
-      }
+      filtrados.slice(0, 20).forEach((p) => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <strong>${p.nombre || "Sin nombre"}</strong><br>
+          Código: ${p.codigo || "-"} | Precio: $${Number(p.precio || 0).toFixed(2)}
+        `;
+        li.onclick = () => {
+          agregarAlCarrito(p);
+          document.getElementById("busqueda").value = "";
+          resultados.innerHTML = "";
+        };
+        resultados.appendChild(li);
+      });
+    }
 
-      const existente = carrito.find(item => Number(item.id) === productoId);
+    function agregarAlCarritoPorId(id) {
+      const producto = productosCache.find((p) => p.id === id);
+      if (producto) {
+        agregarAlCarrito(producto);
+      }
+    }
+
+    function agregarAlCarrito(producto) {
+      const existente = carrito.find((item) => item.id === producto.id);
 
       if (existente) {
-        const nuevaCantidad = existente.cantidad + cantidad;
-        if (nuevaCantidad > stockActual) {
-          showMsg("ventaMsg", `No puedes agregar más de ${stockActual} unidades en total para este producto.`, false);
-          return;
-        }
-        existente.cantidad = nuevaCantidad;
+        existente.cantidad += 1;
       } else {
         carrito.push({
-          id: Number(producto.id),
-          nombre: producto.nombre || "Sin nombre",
+          id: producto.id,
+          nombre: producto.nombre,
           codigo: producto.codigo || "",
           precio: Number(producto.precio || 0),
-          cantidad: cantidad
+          cantidad: 1
         });
       }
 
       renderCarrito();
-      showMsg("ventaMsg", "Producto agregado al carrito.");
-      getEl("cantidadVenta").value = 1;
     }
 
-    function renderCarrito() {
-      const lista = getEl("carritoLista");
+    function quitarDelCarrito(id) {
+      carrito = carrito.filter((item) => item.id !== id);
+      renderCarrito();
+    }
 
-      if (!carrito.length) {
-        lista.innerHTML = '<div class="small">El carrito está vacío.</div>';
-        getEl("totalItems").textContent = "0";
-        getEl("totalGeneral").textContent = "0.00";
+    function cambiarCantidad(id, delta) {
+      const item = carrito.find((p) => p.id === id);
+      if (!item) return;
+
+      item.cantidad += delta;
+
+      if (item.cantidad <= 0) {
+        quitarDelCarrito(id);
         return;
       }
 
-      lista.innerHTML = "";
-
-      let total = 0;
-      let totalItems = 0;
-
-      carrito.forEach((item, index) => {
-        const subtotal = item.precio * item.cantidad;
-        total += subtotal;
-        totalItems += item.cantidad;
-
-        const div = document.createElement("div");
-        div.className = "carrito-item";
-        div.innerHTML = `
-          <div class="carrito-top">
-            <div>
-              <div class="carrito-name">${item.nombre}</div>
-              <div class="carrito-sub">Código: ${item.codigo || "N/A"}</div>
-              <div class="carrito-sub">${item.cantidad} x $${item.precio.toFixed(2)} = $${subtotal.toFixed(2)}</div>
-            </div>
-            <button class="btn-mini" onclick="eliminarItem(${index})">Quitar</button>
-          </div>
-        `;
-
-        lista.appendChild(div);
-      });
-
-      getEl("totalItems").textContent = totalItems;
-      getEl("totalGeneral").textContent = total.toFixed(2);
-    }
-
-    function eliminarItem(index) {
-      carrito.splice(index, 1);
       renderCarrito();
     }
 
     function vaciarCarrito() {
       carrito = [];
       renderCarrito();
-      clearMsg("carritoMsg");
+      document.getElementById("ventaEstado").textContent = "";
     }
 
-    async function finalizarVenta() {
-      clearMsg("carritoMsg");
-      clearMsg("ventaMsg");
+    function renderCarrito() {
+      const lista = document.getElementById("carrito");
+      const totalEl = document.getElementById("total");
+      lista.innerHTML = "";
 
-      const { apiBase, organizacionId, usuarioMovimiento } = getConfig();
-      const nota = getEl("notaVenta").value.trim();
+      if (carrito.length === 0) {
+        lista.innerHTML = "<li>Carrito vacío</li>";
+      } else {
+        carrito.forEach((item) => {
+          const subtotal = item.precio * item.cantidad;
+          const li = document.createElement("li");
+          li.innerHTML = `
+            <div class="carrito-item">
+              <div>
+                <strong>${item.nombre}</strong><br>
+                Código: ${item.codigo || "-"}<br>
+                $${item.precio.toFixed(2)} x ${item.cantidad} = $${subtotal.toFixed(2)}
+              </div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button class="mini-btn" onclick="cambiarCantidad(${item.id}, -1)">-1</button>
+                <button class="mini-btn" onclick="cambiarCantidad(${item.id}, 1)">+1</button>
+                <button class="mini-btn danger" onclick="quitarDelCarrito(${item.id})">Quitar</button>
+              </div>
+            </div>
+          `;
+          lista.appendChild(li);
+        });
+      }
+
+      const total = carrito.reduce((acc, item) => acc + (item.precio * item.cantidad), 0);
+      totalEl.textContent = total.toFixed(2);
+
+      calcularCambio();
+      generarTicket();
+    }
+
+    function calcularCambio() {
+      const total = Number(document.getElementById("total").textContent || 0);
+      const recibido = Number(document.getElementById("montoRecibido").value || 0);
+      const cambio = recibido - total;
+      document.getElementById("cambio").textContent = cambio > 0 ? cambio.toFixed(2) : "0.00";
+      generarTicket();
+    }
+
+    function generarTicket() {
+      const total = Number(document.getElementById("total").textContent || 0).toFixed(2);
+      const formaPago = document.getElementById("formaPago").value;
+      const recibido = Number(document.getElementById("montoRecibido").value || 0).toFixed(2);
+      const cambio = document.getElementById("cambio").textContent;
+
+      const ahora = new Date();
+      const fecha = ahora.toLocaleDateString("es-MX");
+      const hora = ahora.toLocaleTimeString("es-MX");
+
+      let lineas = "";
+      carrito.forEach((item) => {
+        lineas += `${item.nombre}\n`;
+        lineas += `  ${item.cantidad} x $${item.precio.toFixed(2)} = $${(item.cantidad * item.precio).toFixed(2)}\n`;
+      });
+
+      const ticket = `
+MEXA POS
+Nombre tienda: Woppy Demo
+Dirección fiscal: PENDIENTE
+Fecha: ${fecha}
+Hora: ${hora}
+
+PRODUCTOS
+${lineas || "Sin productos"}
+
+TOTAL: $${total}
+Forma de pago: ${formaPago}
+Recibido: $${recibido}
+Cambio: $${cambio}
+      `.trim();
+
+      document.getElementById("ticketPreview").textContent = ticket;
+    }
+
+    async function registrarVenta() {
+      const token = getToken();
+      const estado = document.getElementById("ventaEstado");
 
       if (!token) {
-        showMsg("carritoMsg", "Primero inicia sesión.", false);
+        estado.className = "error";
+        estado.textContent = "Primero inicia sesión";
         return;
       }
 
-      if (!carrito.length) {
-        showMsg("carritoMsg", "El carrito está vacío.", false);
+      if (carrito.length === 0) {
+        estado.className = "error";
+        estado.textContent = "El carrito está vacío";
         return;
       }
 
-      if (!organizacionId) {
-        showMsg("carritoMsg", "Falta Organización ID.", false);
-        return;
-      }
-
-      if (!usuarioMovimiento) {
-        showMsg("carritoMsg", "Falta el usuario que realiza la venta.", false);
-        return;
-      }
-
-      const resumenTicket = {
-        fecha: new Date(),
-        usuario: usuarioMovimiento,
-        items: carrito.map(item => ({
-          nombre: item.nombre,
-          codigo: item.codigo,
-          cantidad: item.cantidad,
-          precio: item.precio,
-          subtotal: item.cantidad * item.precio
-        })),
-        total: carrito.reduce((acc, item) => acc + (item.cantidad * item.precio), 0)
-      };
+      estado.className = "muted";
+      estado.textContent = "Registrando venta...";
 
       try {
         for (const item of carrito) {
-          const payload = {
-            organizacion_id: organizacionId,
-            producto_id: item.id,
-            tipo: "salida",
-            cantidad: item.cantidad,
-            usuario: usuarioMovimiento,
-            nota: nota || "Venta POS"
-          };
-
-          const res = await fetch(`${apiBase}/movimientos/`, {
+          const res = await fetch(`${API_URL}/movimientos/`, {
             method: "POST",
             headers: {
-              "accept": "application/json",
               "Content-Type": "application/json",
               "Authorization": `Bearer ${token}`
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+              producto_id: item.id,
+              tipo: "salida",
+              cantidad: item.cantidad,
+              usuario: "POS Web"
+            })
           });
 
-          const data = await res.json().catch(() => ({}));
+          const data = await res.json();
+          console.log("MOVIMIENTO RESPONSE:", data);
 
           if (!res.ok) {
-            showMsg("carritoMsg", `Error al vender "${item.nombre}":\n` + JSON.stringify(data, null, 2), false);
+            estado.className = "error";
+            estado.textContent = data.detail || `Error registrando ${item.nombre}`;
             return;
           }
         }
 
-        ultimoTicket = resumenTicket;
-        renderTicket();
-
-        showMsg("carritoMsg", "Venta completada correctamente.");
-        carrito = [];
-        renderCarrito();
-        getEl("cantidadVenta").value = 1;
-
-        await cargarProductos();
+        estado.className = "success";
+        estado.textContent = "Venta registrada correctamente";
+        vaciarCarrito();
+        cargarProductos();
       } catch (error) {
-        showMsg("carritoMsg", "Error de conexión:\n" + error.message, false);
+        console.error(error);
+        estado.className = "error";
+        estado.textContent = "Error de conexión al registrar venta";
       }
     }
 
-    function renderTicket() {
-      const ticketItems = getEl("ticketItems");
-      const ticketFecha = getEl("ticketFecha");
-      const ticketUsuario = getEl("ticketUsuario");
-      const ticketTotal = getEl("ticketTotal");
-
-      if (!ultimoTicket) {
-        ticketItems.innerHTML = '<div class="ticket-empty">Todavía no hay ticket generado.</div>';
-        ticketFecha.textContent = "Sin venta todavía";
-        ticketUsuario.textContent = "Usuario: -";
-        ticketTotal.textContent = "0.00";
-        return;
-      }
-
-      const fechaTexto = ultimoTicket.fecha.toLocaleString("es-MX");
-      ticketFecha.textContent = `Fecha: ${fechaTexto}`;
-      ticketUsuario.textContent = `Usuario: ${ultimoTicket.usuario}`;
-      ticketTotal.textContent = ultimoTicket.total.toFixed(2);
-
-      ticketItems.innerHTML = "";
-
-      ultimoTicket.items.forEach(item => {
-        const div = document.createElement("div");
-        div.className = "ticket-item";
-        div.innerHTML = `
-          <div class="ticket-name">${item.nombre}</div>
-          <div class="ticket-sub">Código: ${item.codigo || "N/A"}</div>
-          <div class="ticket-sub">${item.cantidad} x $${item.precio.toFixed(2)} = $${item.subtotal.toFixed(2)}</div>
-        `;
-        ticketItems.appendChild(div);
-      });
-    }
-
-    function imprimirTicket() {
-      if (!ultimoTicket) {
-        alert("Todavía no hay ticket generado.");
-        return;
-      }
-
-      document.body.classList.add("print-ticket-only");
-      window.print();
-      document.body.classList.remove("print-ticket-only");
-    }
-
-    loadFromStorage();
-    renderCarrito();
-    renderTicket();
+    actualizarEstadoSesion();
+    generarTicket();
   </script>
 </body>
 </html>
