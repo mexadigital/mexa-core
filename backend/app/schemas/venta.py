@@ -1,22 +1,36 @@
+from pydantic import BaseModel
+from typing import List
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+
+
+class VentaItemCreate(BaseModel):
+    producto_id: int
+    cantidad: int
 
 
 class VentaCreate(BaseModel):
+    productos: List[VentaItemCreate]
+
+
+class VentaDetalleOut(BaseModel):
     producto_id: int
-    ubicacion_id: int
     cantidad: int
+    precio_unitario: float
+    subtotal: float
+
+    model_config = {
+        "from_attributes": True
+    }
 
 
 class VentaOut(BaseModel):
     id: int
     organizacion_id: int
-    producto_id: int
-    ubicacion_id: int
-    cantidad: int
-    precio_unitario: float
-    total: float
     usuario_id: int
-    fecha: datetime
+    total: float
+    created_at: datetime
+    detalles: List[VentaDetalleOut]
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = {
+        "from_attributes": True
+    }
