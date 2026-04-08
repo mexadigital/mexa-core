@@ -19,6 +19,9 @@ from app.api.ubicaciones import router as ubicaciones_router
 from app.api.inventario_ubicaciones import router as inventario_ubicaciones_router
 from app.api.traspasos import router as traspasos_router
 
+# 🔥 NUEVO (VENTAS)
+from app.api.ventas import router as ventas_router
+
 
 # Crear tablas
 Base.metadata.create_all(bind=engine)
@@ -30,7 +33,7 @@ app = FastAPI(
 )
 
 # =========================
-# 🔥 CORS (ARREGLADO)
+# 🔥 CORS
 # =========================
 origins = [
     "http://localhost:5500",
@@ -38,7 +41,7 @@ origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 
-    # 👉 TU FRONTEND EN RENDER (IMPORTANTE)
+    # 👉 TU FRONTEND EN RENDER
     "https://mexa-core-2.onrender.com",
 ]
 
@@ -105,3 +108,9 @@ app.include_router(
     prefix="/traspasos",
     tags=["Traspasos"]
 )
+
+# =========================
+# 🔥 VENTAS (AQUÍ ESTÁ EL PODER)
+# =========================
+
+app.include_router(ventas_router)
