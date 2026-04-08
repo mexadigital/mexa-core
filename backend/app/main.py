@@ -24,7 +24,10 @@ from app.api.ventas import router as ventas_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Crear tablas nuevas que no existan
+    """
+    Inicialización de la aplicación.
+    Crea tablas que no existan al arrancar.
+    """
     Base.metadata.create_all(bind=engine)
     yield
 
@@ -63,34 +66,52 @@ def root():
     return {
         "message": "Mexa Digital API funcionando",
         "version": settings.APP_VERSION,
+        "status": "ok",
     }
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+    }
 
 
 # =========================
-# FIX TEMPORAL DB
-# BORRAR DESPUÉS DE USAR
+# FIX TEMPORAL DE BD
+# USAR SOLO PARA LIMPIAR LA ESTRUCTURA DE VENTAS
+# BORRAR DESPUÉS DE EJECUTARLO UNA VEZ
 # =========================
 @app.get("/fix-db")
 def fix_db():
+    """
+    Reinicia las tablas de ventas para reconstruirlas
+    con la estructura correcta definida en los modelos.
+    """
     with engine.connect() as conn:
-        conn.execute(text("""
-            ALTER TABLE ventas
-            ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
-        """))
+        conn.execute(text("DROP TABLE IF EXISTS venta_detalles CASCADE;"))
+        conn.execute(text("DROP TABLE IF EXISTS ventas CASCADE;"))
         conn.commit()
 
-    return {"message": "DB fixed"}
+    # Recrear tablas inmediatamente
+    Base.metadata.create_all(bind=engine)
+
+    return {
+        "message": "DB reset",
+        "detail": "Tablas ventas y venta_detalles recreadas correctamente"
+    }
 
 
 # =========================
 # ROUTERS
 # =========================
-app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(
+    auth_router,
+    prefix="/auth",
+    tags=["Auth"],
+)
 
 app.include_router(
     organizaciones_router,
@@ -105,7 +126,9 @@ app.include_router(
 )
 
 # Este router ya trae su prefix interno
-app.include_router(movimientos_router)
+app.include_router(
+    movimientos_router,
+)
 
 app.include_router(
     ubicaciones_router,
@@ -126,4 +149,6 @@ app.include_router(
 )
 
 # Este router ya trae prefix="/ventas"
-app.include_router(ventas_router)
+app.include_router(
+    ventas_router,
+)
