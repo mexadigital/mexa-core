@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from app.db.database import get_db
 from app.schemas.venta import VentaCreate, VentaOut
@@ -24,16 +25,17 @@ def crear_venta(
     organizacion_id = current_user.organizacion_id
     usuario_id = current_user.id
 
+    # 🔥 FIX AQUÍ (created_at manual)
     venta = Venta(
         organizacion_id=organizacion_id,
         usuario_id=usuario_id,
-        total=0
+        total=0,
+        created_at=datetime.utcnow()
     )
     db.add(venta)
     db.flush()
 
     total_venta = 0
-    detalles = []
 
     for item in data.productos:
         if item.cantidad <= 0:
@@ -66,8 +68,10 @@ def crear_venta(
         precio_unitario = float(producto.precio or 0)
         subtotal = precio_unitario * item.cantidad
 
+        # 🔻 descontar inventario
         producto.cantidad -= item.cantidad
 
+        # 🔻 registrar movimiento
         movimiento = Movimiento(
             organizacion_id=organizacion_id,
             producto_id=producto.id,
@@ -77,6 +81,7 @@ def crear_venta(
         )
         db.add(movimiento)
 
+        # 🔻 detalle de venta
         detalle = VentaDetalle(
             venta_id=venta.id,
             producto_id=producto.id,
@@ -85,10 +90,10 @@ def crear_venta(
             subtotal=subtotal
         )
         db.add(detalle)
-        detalles.append(detalle)
 
         total_venta += subtotal
 
+    # 🔻 total final
     venta.total = total_venta
 
     db.commit()
