@@ -1,21 +1,24 @@
+
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Literal
 
 
-class MovimientoBase(BaseModel):
+# 🔹 SOLO lo que el usuario debe enviar
+class MovimientoCreate(BaseModel):
+    producto_id: int
+    tipo: Literal["entrada", "salida"]
+    cantidad: int
+
+
+# 🔹 Lo que regresa el sistema
+class MovimientoOut(BaseModel):
+    id: int
     organizacion_id: int
     producto_id: int
     tipo: str
     cantidad: int
     usuario: str
-
-
-class MovimientoCreate(MovimientoBase):
-    pass
-
-
-class MovimientoOut(MovimientoBase):
-    id: int
     created_at: datetime
 
     class Config:
