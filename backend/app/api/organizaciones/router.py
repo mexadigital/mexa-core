@@ -5,7 +5,7 @@ from app.db.database import get_db
 from app.models.organizacion import Organizacion
 from app.schemas.organizacion import OrganizacionCreate, OrganizacionOut
 
-router = APIRouter(prefix="/organizaciones", tags=["Organizaciones"])
+router = APIRouter()
 
 
 @router.post("/", response_model=OrganizacionOut)
