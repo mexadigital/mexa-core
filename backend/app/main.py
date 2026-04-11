@@ -145,9 +145,10 @@ app.include_router(
     tags=["Productos"],
 )
 
-# movimientos ya trae prefix interno
 app.include_router(
     movimientos_router,
+    prefix="/movimientos",
+    tags=["Movimientos"],
 )
 
 app.include_router(
@@ -168,7 +169,8 @@ app.include_router(
     tags=["Traspasos"],
 )
 
-# ventas ya trae prefix interno
 app.include_router(
     ventas_router,
+    prefix="/ventas",
+    tags=["Ventas"],
 )
