@@ -53,10 +53,6 @@ def run_startup_migrations():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Inicialización de la aplicación.
-    Crea tablas que no existan y alinea columnas faltantes al arrancar.
-    """
     Base.metadata.create_all(bind=engine)
     run_startup_migrations()
     yield
@@ -114,9 +110,6 @@ def health():
 # =========================
 @app.get("/fix-db")
 def fix_db():
-    """
-    Reinicia las tablas de ventas
-    """
     with engine.connect() as conn:
         conn.execute(text("DROP TABLE IF EXISTS venta_detalles CASCADE;"))
         conn.execute(text("DROP TABLE IF EXISTS ventas CASCADE;"))
