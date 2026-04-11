@@ -10,7 +10,7 @@ from app.models.venta import Venta, VentaDetalle
 from app.models.usuario import Usuario
 from app.api.deps import get_current_user
 
-router = APIRouter(prefix="/ventas", tags=["Ventas"])
+router = APIRouter()
 
 
 @router.post("/", response_model=VentaOut)
