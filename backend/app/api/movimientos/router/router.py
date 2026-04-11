@@ -7,7 +7,7 @@ from app.models.movimiento import Movimiento
 from app.models.producto import Producto
 from app.schemas.movimiento import MovimientoCreate, MovimientoOut
 
-router = APIRouter(prefix="/movimientos", tags=["Movimientos"])
+router = APIRouter()
 
 
 @router.post("/", response_model=MovimientoOut)
