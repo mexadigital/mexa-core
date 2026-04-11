@@ -22,13 +22,43 @@ from app.api.traspasos import router as traspasos_router
 from app.api.ventas import router as ventas_router
 
 
+def run_startup_migrations():
+    with engine.connect() as conn:
+        # Movimientos
+        conn.execute(text("""
+            ALTER TABLE movimientos
+            ADD COLUMN IF NOT EXISTS recibe VARCHAR;
+        """))
+        conn.execute(text("""
+            ALTER TABLE movimientos
+            ADD COLUMN IF NOT EXISTS empleado VARCHAR;
+        """))
+        conn.execute(text("""
+            ALTER TABLE movimientos
+            ADD COLUMN IF NOT EXISTS nota VARCHAR;
+        """))
+        conn.execute(text("""
+            ALTER TABLE movimientos
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+        """))
+
+        # Ventas
+        conn.execute(text("""
+            ALTER TABLE ventas
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+        """))
+
+        conn.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Inicialización de la aplicación.
-    Crea tablas que no existan al arrancar.
+    Crea tablas que no existan y alinea columnas faltantes al arrancar.
     """
     Base.metadata.create_all(bind=engine)
+    run_startup_migrations()
     yield
 
 
@@ -93,28 +123,12 @@ def fix_db():
         conn.commit()
 
     Base.metadata.create_all(bind=engine)
+    run_startup_migrations()
 
     return {
         "message": "DB reset",
         "detail": "Tablas ventas recreadas correctamente"
     }
-
-
-# =========================
-# 🔥 AGREGAR COLUMNAS MOVIMIENTOS (VALE)
-# =========================
-@app.get("/add-column-movimientos")
-def add_columns():
-    """
-    Agrega columnas para vale de almacén
-    """
-    with engine.connect() as conn:
-        conn.execute(text("ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS recibe VARCHAR;"))
-        conn.execute(text("ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS empleado VARCHAR;"))
-        conn.execute(text("ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS nota VARCHAR;"))
-        conn.commit()
-
-    return {"ok": True}
 
 
 # =========================
