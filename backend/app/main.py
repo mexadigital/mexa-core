@@ -80,28 +80,41 @@ def health():
 
 
 # =========================
-# FIX TEMPORAL DE BD
-# USAR SOLO PARA LIMPIAR LA ESTRUCTURA DE VENTAS
-# BORRAR DESPUÉS DE EJECUTARLO UNA VEZ
+# FIX TEMPORAL DE BD (VENTAS)
 # =========================
 @app.get("/fix-db")
 def fix_db():
     """
-    Reinicia las tablas de ventas para reconstruirlas
-    con la estructura correcta definida en los modelos.
+    Reinicia las tablas de ventas
     """
     with engine.connect() as conn:
         conn.execute(text("DROP TABLE IF EXISTS venta_detalles CASCADE;"))
         conn.execute(text("DROP TABLE IF EXISTS ventas CASCADE;"))
         conn.commit()
 
-    # Recrear tablas inmediatamente
     Base.metadata.create_all(bind=engine)
 
     return {
         "message": "DB reset",
-        "detail": "Tablas ventas y venta_detalles recreadas correctamente"
+        "detail": "Tablas ventas recreadas correctamente"
     }
+
+
+# =========================
+# 🔥 AGREGAR COLUMNAS MOVIMIENTOS (VALE)
+# =========================
+@app.get("/add-column-movimientos")
+def add_columns():
+    """
+    Agrega columnas para vale de almacén
+    """
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS recibe VARCHAR;"))
+        conn.execute(text("ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS empleado VARCHAR;"))
+        conn.execute(text("ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS nota VARCHAR;"))
+        conn.commit()
+
+    return {"ok": True}
 
 
 # =========================
@@ -125,7 +138,7 @@ app.include_router(
     tags=["Productos"],
 )
 
-# Este router ya trae su prefix interno
+# movimientos ya trae prefix interno
 app.include_router(
     movimientos_router,
 )
@@ -148,7 +161,7 @@ app.include_router(
     tags=["Traspasos"],
 )
 
-# Este router ya trae prefix="/ventas"
+# ventas ya trae prefix interno
 app.include_router(
     ventas_router,
 )
