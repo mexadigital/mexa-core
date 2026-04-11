@@ -7,7 +7,7 @@ from app.models.organizacion import Organizacion
 from app.schemas.producto import ProductoCreate, ProductoOut
 from app.core.deps import get_current_user
 
-router = APIRouter(prefix="/productos", tags=["Productos"])
+router = APIRouter()
 
 
 # =========================
