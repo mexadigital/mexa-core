@@ -6,7 +6,7 @@ from app.models.usuario import Usuario
 from app.schemas.usuario import UsuarioCreate, UsuarioLogin, UsuarioOut, Token
 from app.core.security import hash_password, verify_password, create_access_token
 
-router = APIRouter(prefix="/auth", tags=["Auth"])
+router = APIRouter()
 
 
 @router.post("/register", response_model=UsuarioOut)
