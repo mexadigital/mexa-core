@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.deps import get_current_user
 from app.db.database import get_db
 from app.models.movimiento import Movimiento
 from app.models.producto import Producto
 from app.schemas.movimiento import MovimientoCreate, MovimientoOut
-from app.core.deps import get_current_user
 
 router = APIRouter(prefix="/movimientos", tags=["Movimientos"])
 
@@ -16,10 +16,14 @@ def crear_movimiento(
     db: Session = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    producto = db.query(Producto).filter(
-        Producto.id == data.producto_id,
-        Producto.organizacion_id == user["organizacion_id"]
-    ).first()
+    producto = (
+        db.query(Producto)
+        .filter(
+            Producto.id == data.producto_id,
+            Producto.organizacion_id == user["organizacion_id"]
+        )
+        .first()
+    )
 
     if not producto:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -43,7 +47,10 @@ def crear_movimiento(
         producto_id=data.producto_id,
         tipo=data.tipo,
         cantidad=data.cantidad,
-        usuario=user["sub"]
+        usuario=user["sub"],
+        recibe=data.recibe,
+        empleado=data.empleado,
+        nota=data.nota,
     )
 
     db.add(movimiento)
@@ -58,9 +65,15 @@ def listar_movimientos(
     db: Session = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    return db.query(Movimiento).filter(
-        Movimiento.organizacion_id == user["organizacion_id"]
-    ).order_by(Movimiento.created_at.desc()).limit(200).all()
+    movimientos = (
+        db.query(Movimiento)
+        .filter(Movimiento.organizacion_id == user["organizacion_id"])
+        .order_by(Movimiento.created_at.desc())
+        .limit(200)
+        .all()
+    )
+
+    return movimientos
 
 
 @router.get("/producto/{producto_id}", response_model=list[MovimientoOut])
@@ -69,18 +82,27 @@ def listar_movimientos_por_producto(
     db: Session = Depends(get_db),
     user=Depends(get_current_user)
 ):
-    producto = db.query(Producto).filter(
-        Producto.id == producto_id,
-        Producto.organizacion_id == user["organizacion_id"]
-    ).first()
+    producto = (
+        db.query(Producto)
+        .filter(
+            Producto.id == producto_id,
+            Producto.organizacion_id == user["organizacion_id"]
+        )
+        .first()
+    )
 
     if not producto:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    movimientos = db.query(Movimiento).filter(
-        Movimiento.producto_id == producto_id,
-        Movimiento.organizacion_id == user["organizacion_id"]
-    ).order_by(Movimiento.created_at.desc()).all()
+    movimientos = (
+        db.query(Movimiento)
+        .filter(
+            Movimiento.producto_id == producto_id,
+            Movimiento.organizacion_id == user["organizacion_id"]
+        )
+        .order_by(Movimiento.created_at.desc())
+        .all()
+    )
 
     if not movimientos:
         raise HTTPException(status_code=404, detail="No hay movimientos para este producto")
