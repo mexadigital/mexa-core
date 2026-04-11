@@ -6,7 +6,7 @@ from app.models.ubicacion import Ubicacion
 from app.schemas.ubicacion import UbicacionCreate, UbicacionUpdate, UbicacionOut
 from app.core.deps import get_current_user
 
-router = APIRouter(prefix="/ubicaciones", tags=["Ubicaciones"])
+router = APIRouter()
 
 
 @router.post("/", response_model=UbicacionOut, status_code=status.HTTP_201_CREATED)
