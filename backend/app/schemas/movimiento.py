@@ -1,18 +1,17 @@
 from datetime import datetime
-from typing import Literal
+from typing import Optional
 
 from pydantic import BaseModel
 
 
 class MovimientoCreate(BaseModel):
     producto_id: int
-    tipo: Literal["entrada", "salida"]
+    tipo: str
     cantidad: int
-
-    # Campos opcionales tipo vale
-    recibe: str | None = None
-    empleado: str | None = None
-    nota: str | None = None
+    usuario: str
+    recibe: Optional[str] = None
+    empleado: Optional[str] = None
+    nota: Optional[str] = None
 
 
 class MovimientoOut(BaseModel):
@@ -22,11 +21,9 @@ class MovimientoOut(BaseModel):
     tipo: str
     cantidad: int
     usuario: str
-
-    recibe: str | None = None
-    empleado: str | None = None
-    nota: str | None = None
-
+    recibe: Optional[str] = None
+    empleado: Optional[str] = None
+    nota: Optional[str] = None
     created_at: datetime
 
     class Config:
