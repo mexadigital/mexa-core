@@ -1,26 +1,26 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user
+from app.api.auth import get_current_user
 from app.db.database import get_db
 from app.models.movimiento import Movimiento
 from app.models.producto import Producto
 from app.schemas.movimiento import MovimientoCreate, MovimientoOut
 
-router = APIRouter()
+router = APIRouter(prefix="/movimientos", tags=["Movimientos"])
 
 
 @router.post("/", response_model=MovimientoOut)
 def crear_movimiento(
-    data: MovimientoCreate,
+    payload: MovimientoCreate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user: dict = Depends(get_current_user),
 ):
     producto = (
         db.query(Producto)
         .filter(
-            Producto.id == data.producto_id,
-            Producto.organizacion_id == user["organizacion_id"]
+            Producto.id == payload.producto_id,
+            Producto.organizacion_id == user["organizacion_id"],
         )
         .first()
     )
@@ -28,29 +28,28 @@ def crear_movimiento(
     if not producto:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    if data.cantidad <= 0:
+    if payload.tipo not in ["entrada", "salida"]:
+        raise HTTPException(status_code=400, detail="Tipo de movimiento inválido")
+
+    if payload.cantidad <= 0:
         raise HTTPException(status_code=400, detail="Cantidad inválida")
 
-    if data.tipo == "salida":
-        if producto.cantidad < data.cantidad:
-            raise HTTPException(status_code=400, detail="Stock insuficiente")
-        producto.cantidad -= data.cantidad
-
-    elif data.tipo == "entrada":
-        producto.cantidad += data.cantidad
-
+    if payload.tipo == "entrada":
+        producto.cantidad += payload.cantidad
     else:
-        raise HTTPException(status_code=400, detail="Tipo inválido")
+        if producto.cantidad < payload.cantidad:
+            raise HTTPException(status_code=400, detail="Stock insuficiente")
+        producto.cantidad -= payload.cantidad
 
     movimiento = Movimiento(
         organizacion_id=user["organizacion_id"],
-        producto_id=data.producto_id,
-        tipo=data.tipo,
-        cantidad=data.cantidad,
-        usuario=user["sub"],
-        recibe=data.recibe,
-        empleado=data.empleado,
-        nota=data.nota,
+        producto_id=payload.producto_id,
+        tipo=payload.tipo,
+        cantidad=payload.cantidad,
+        usuario=payload.usuario,
+        recibe=payload.recibe,
+        empleado=payload.empleado,
+        nota=payload.nota,
     )
 
     db.add(movimiento)
@@ -63,48 +62,33 @@ def crear_movimiento(
 @router.get("/", response_model=list[MovimientoOut])
 def listar_movimientos(
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user: dict = Depends(get_current_user),
 ):
     movimientos = (
         db.query(Movimiento)
         .filter(Movimiento.organizacion_id == user["organizacion_id"])
-        .order_by(Movimiento.created_at.desc())
-        .limit(200)
+        .order_by(Movimiento.id.desc())
         .all()
     )
-
     return movimientos
 
 
-@router.get("/producto/{producto_id}", response_model=list[MovimientoOut])
-def listar_movimientos_por_producto(
-    producto_id: int,
+@router.get("/{movimiento_id}", response_model=MovimientoOut)
+def obtener_movimiento(
+    movimiento_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user)
+    user: dict = Depends(get_current_user),
 ):
-    producto = (
-        db.query(Producto)
+    movimiento = (
+        db.query(Movimiento)
         .filter(
-            Producto.id == producto_id,
-            Producto.organizacion_id == user["organizacion_id"]
+            Movimiento.id == movimiento_id,
+            Movimiento.organizacion_id == user["organizacion_id"],
         )
         .first()
     )
 
-    if not producto:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    if not movimiento:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado")
 
-    movimientos = (
-        db.query(Movimiento)
-        .filter(
-            Movimiento.producto_id == producto_id,
-            Movimiento.organizacion_id == user["organizacion_id"]
-        )
-        .order_by(Movimiento.created_at.desc())
-        .all()
-    )
-
-    if not movimientos:
-        raise HTTPException(status_code=404, detail="No hay movimientos para este producto")
-
-    return movimientos
+    return movimiento
