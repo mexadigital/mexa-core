@@ -5,10 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.db.database import engine
 from app.db.base import Base
+from app.db.database import engine
 
-# Registrar modelos
+# Importar modelos para que SQLAlchemy registre todas las tablas
 import app.models  # noqa: F401
 
 # Routers
@@ -20,41 +20,69 @@ from app.api.ubicaciones import router as ubicaciones_router
 from app.api.inventario_ubicaciones import router as inventario_ubicaciones_router
 from app.api.traspasos import router as traspasos_router
 from app.api.ventas import router as ventas_router
+from app.api.requisiciones import router as requisiciones_router
 
 
-def run_startup_migrations():
+def run_startup_migrations() -> None:
+    """
+    Migraciones ligeras para no tronarte si agregas columnas nuevas.
+    Si alguna tabla no existe todavía, se ignora ese bloque.
+    """
     with engine.connect() as conn:
-        # Movimientos
-        conn.execute(text("""
-            ALTER TABLE movimientos
-            ADD COLUMN IF NOT EXISTS recibe VARCHAR;
-        """))
-        conn.execute(text("""
-            ALTER TABLE movimientos
-            ADD COLUMN IF NOT EXISTS empleado VARCHAR;
-        """))
-        conn.execute(text("""
-            ALTER TABLE movimientos
-            ADD COLUMN IF NOT EXISTS nota VARCHAR;
-        """))
-        conn.execute(text("""
-            ALTER TABLE movimientos
-            ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
-        """))
+        # =========================
+        # MOVIMIENTOS
+        # =========================
+        try:
+            conn.execute(text("""
+                ALTER TABLE movimientos
+                ADD COLUMN IF NOT EXISTS recibe VARCHAR;
+            """))
+        except Exception:
+            pass
 
-        # Ventas
-        conn.execute(text("""
-            ALTER TABLE ventas
-            ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
-        """))
+        try:
+            conn.execute(text("""
+                ALTER TABLE movimientos
+                ADD COLUMN IF NOT EXISTS empleado VARCHAR;
+            """))
+        except Exception:
+            pass
 
+        try:
+            conn.execute(text("""
+                ALTER TABLE movimientos
+                ADD COLUMN IF NOT EXISTS nota TEXT;
+            """))
+        except Exception:
+            pass
+
+        # =========================
+        # UBICACIONES
+        # =========================
+        try:
+            conn.execute(text("""
+                ALTER TABLE ubicaciones
+                ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE;
+            """))
+        except Exception:
+            pass
+
+        # =========================
+        # REQUISICIONES
+        # =========================
+        # Estas tablas normalmente las crea Base.metadata.create_all()
+        # pero dejamos este espacio por si luego quieres migraciones ligeras.
         conn.commit()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Crear tablas nuevas que estén registradas en modelos
     Base.metadata.create_all(bind=engine)
+
+    # Correr migraciones ligeras
     run_startup_migrations()
+
     yield
 
 
@@ -65,15 +93,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# =========================
 # CORS
-# =========================
 origins = [
     "http://localhost:5500",
     "http://127.0.0.1:5500",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "https://mexa-core-2.onrender.com",
+    "https://mexa-core-1.onrender.com",
 ]
 
 app.add_middleware(
@@ -84,93 +110,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # =========================
 # RUTAS BASE
 # =========================
 @app.get("/")
 def root():
     return {
-        "message": "Mexa Digital API funcionando",
+        "message": "Mexa Core API funcionando",
+        "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
-        "status": "ok",
+        "docs": "/docs",
     }
 
 
 @app.get("/health")
 def health():
-    return {
-        "status": "ok",
-        "app": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-    }
-
-
-# =========================
-# FIX TEMPORAL DE BD (VENTAS)
-# =========================
-@app.get("/fix-db")
-def fix_db():
-    with engine.connect() as conn:
-        conn.execute(text("DROP TABLE IF EXISTS venta_detalles CASCADE;"))
-        conn.execute(text("DROP TABLE IF EXISTS ventas CASCADE;"))
-        conn.commit()
-
-    Base.metadata.create_all(bind=engine)
-    run_startup_migrations()
-
-    return {
-        "message": "DB reset",
-        "detail": "Tablas ventas recreadas correctamente"
-    }
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "connected"}
+    except Exception as e:
+        return {"status": "error", "database": str(e)}
 
 
 # =========================
 # ROUTERS
 # =========================
-app.include_router(
-    auth_router,
-    prefix="/auth",
-    tags=["Auth"],
-)
-
-app.include_router(
-    organizaciones_router,
-    prefix="/organizaciones",
-    tags=["Organizaciones"],
-)
-
-app.include_router(
-    productos_router,
-    prefix="/productos",
-    tags=["Productos"],
-)
-
-app.include_router(
-    movimientos_router,
-    prefix="/movimientos",
-    tags=["Movimientos"],
-)
-
-app.include_router(
-    ubicaciones_router,
-    prefix="/ubicaciones",
-    tags=["Ubicaciones"],
-)
-
-app.include_router(
-    inventario_ubicaciones_router,
-    prefix="/inventario-ubicaciones",
-    tags=["Inventario Ubicaciones"],
-)
-
-app.include_router(
-    traspasos_router,
-    prefix="/traspasos",
-    tags=["Traspasos"],
-)
-
-app.include_router(
-    ventas_router,
-    prefix="/ventas",
-    tags=["Ventas"],
-)
+app.include_router(auth_router)
+app.include_router(organizaciones_router)
+app.include_router(productos_router)
+app.include_router(movimientos_router)
+app.include_router(ubicaciones_router)
+app.include_router(inventario_ubicaciones_router)
+app.include_router(traspasos_router)
+app.include_router(ventas_router)
+app.include_router(requisiciones_router)
