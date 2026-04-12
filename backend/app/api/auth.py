@@ -1,12 +1,52 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.security import hash_password, verify_password, create_access_token
 from app.db.database import get_db
 from app.models.usuario import Usuario
 from app.schemas.usuario import UsuarioCreate, UsuarioLogin, UsuarioOut, Token
-from app.core.security import hash_password, verify_password, create_access_token
 
-router = APIRouter()
+router = APIRouter(prefix="/auth", tags=["Auth"])
+security = HTTPBearer()
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict:
+    token = credentials.credentials
+
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="No autenticado",
+    )
+
+    try:
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+        )
+
+        email: Optional[str] = payload.get("sub")
+        user_id: Optional[int] = payload.get("user_id")
+        organizacion_id: Optional[int] = payload.get("organizacion_id")
+
+        if email is None or user_id is None or organizacion_id is None:
+            raise credentials_exception
+
+        return {
+            "email": email,
+            "user_id": user_id,
+            "organizacion_id": organizacion_id,
+        }
+
+    except JWTError:
+        raise credentials_exception
 
 
 @router.post("/register", response_model=UsuarioOut)
