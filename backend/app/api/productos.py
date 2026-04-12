@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user
+from app.api.auth import get_current_user
 from app.db.database import get_db
 from app.models.organizacion import Organizacion
 from app.models.producto import Producto
@@ -10,11 +10,14 @@ from app.schemas.producto import ProductoCreate, ProductoOut
 router = APIRouter(prefix="/productos", tags=["Productos"])
 
 
+# =========================
+# Crear producto
+# =========================
 @router.post("/", response_model=ProductoOut)
 def crear_producto(
     payload: ProductoCreate,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user: dict = Depends(get_current_user),
 ):
     org = db.query(Organizacion).filter(
         Organizacion.id == user["organizacion_id"]
@@ -40,10 +43,13 @@ def crear_producto(
     return producto
 
 
+# =========================
+# Listar productos
+# =========================
 @router.get("/", response_model=list[ProductoOut])
 def listar_productos(
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user: dict = Depends(get_current_user),
 ):
     productos = (
         db.query(Producto)
@@ -54,11 +60,14 @@ def listar_productos(
     return productos
 
 
+# =========================
+# Obtener producto por ID
+# =========================
 @router.get("/{producto_id}", response_model=ProductoOut)
 def obtener_producto(
     producto_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user: dict = Depends(get_current_user),
 ):
     producto = (
         db.query(Producto)
