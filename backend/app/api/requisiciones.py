@@ -3,7 +3,10 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
+from app.api.auth import get_current_user
 from app.db.database import get_db
+from app.models.movimiento import Movimiento
+from app.models.producto import Producto
 from app.models.requisicion import Requisicion
 from app.models.requisicion_detalle import RequisicionDetalle
 from app.schemas.requisicion import (
@@ -11,8 +14,6 @@ from app.schemas.requisicion import (
     RequisicionOut,
     RequisicionSurtir,
 )
-from app.api.auth import get_current_user
-
 
 router = APIRouter(prefix="/requisiciones", tags=["Requisiciones"])
 
@@ -21,9 +22,6 @@ def generar_folio() -> str:
     return f"REQ-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
 
-# =========================
-# CREAR REQUISICIÓN
-# =========================
 @router.post("/", response_model=RequisicionOut, status_code=201)
 def crear_requisicion(
     data: RequisicionCreate,
@@ -69,9 +67,6 @@ def crear_requisicion(
     return requisicion
 
 
-# =========================
-# LISTAR REQUISICIONES
-# =========================
 @router.get("/", response_model=list[RequisicionOut])
 def listar_requisiciones(
     db: Session = Depends(get_db),
@@ -87,9 +82,6 @@ def listar_requisiciones(
     return items
 
 
-# =========================
-# OBTENER REQUISICIÓN
-# =========================
 @router.get("/{requisicion_id}", response_model=RequisicionOut)
 def obtener_requisicion(
     requisicion_id: int,
@@ -112,9 +104,6 @@ def obtener_requisicion(
     return item
 
 
-# =========================
-# SURTIR REQUISICIÓN
-# =========================
 @router.put("/{requisicion_id}/surtir", response_model=RequisicionOut)
 def surtir_requisicion(
     requisicion_id: int,
@@ -143,20 +132,48 @@ def surtir_requisicion(
         if not detalle:
             raise HTTPException(
                 status_code=404,
-                detail=f"Detalle {item.detalle_id} no encontrado"
+                detail=f"Detalle {item.detalle_id} no encontrado",
             )
 
-        if item.cantidad_surtida < 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Cantidad surtida inválida"
-            )
+        if item.cantidad_surtida <= 0:
+            raise HTTPException(status_code=400, detail="Cantidad inválida")
 
         if detalle.cantidad_surtida + item.cantidad_surtida > detalle.cantidad_solicitada:
             raise HTTPException(
                 status_code=400,
-                detail="No puedes surtir más de lo solicitado"
+                detail="No puedes surtir más de lo solicitado",
             )
+
+        producto = (
+            db.query(Producto)
+            .filter(
+                Producto.id == detalle.producto_id,
+                Producto.organizacion_id == user["organizacion_id"],
+            )
+            .first()
+        )
+
+        if not producto:
+            raise HTTPException(status_code=404, detail="Producto no encontrado")
+
+        if producto.cantidad < item.cantidad_surtida:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Stock insuficiente para {producto.nombre}",
+            )
+
+        producto.cantidad -= item.cantidad_surtida
+
+        movimiento = Movimiento(
+            organizacion_id=user["organizacion_id"],
+            producto_id=producto.id,
+            tipo="salida",
+            cantidad=item.cantidad_surtida,
+            usuario=user["email"],
+            recibe=requisicion.solicitante,
+            nota=f"Surtido requisición {requisicion.folio}",
+        )
+        db.add(movimiento)
 
         detalle.cantidad_surtida += item.cantidad_surtida
 
