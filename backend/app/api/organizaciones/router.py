@@ -5,12 +5,16 @@ from app.db.database import get_db
 from app.models.organizacion import Organizacion
 from app.schemas.organizacion import OrganizacionCreate, OrganizacionOut
 
-router = APIRouter()
+router = APIRouter(prefix="/organizaciones", tags=["Organizaciones"])
 
 
 @router.post("/", response_model=OrganizacionOut)
 def crear_organizacion(payload: OrganizacionCreate, db: Session = Depends(get_db)):
-    org = Organizacion(nombre=payload.nombre, rfc=payload.rfc, plan=payload.plan)
+    org = Organizacion(
+        nombre=payload.nombre,
+        rfc=payload.rfc,
+        plan=payload.plan,
+    )
     db.add(org)
     db.commit()
     db.refresh(org)
