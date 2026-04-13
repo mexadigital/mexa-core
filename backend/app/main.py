@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.database import engine
 
-# Importar modelos para que SQLAlchemy registre todas las tablas
+# Registrar modelos
 import app.models  # noqa: F401
 
 # Routers
@@ -24,11 +24,8 @@ from app.api.requisiciones import router as requisiciones_router
 
 
 def run_startup_migrations() -> None:
-    """
-    Migraciones ligeras para no tronarte si agregas columnas nuevas.
-    Si alguna tabla no existe todavía, se ignora ese bloque.
-    """
     with engine.connect() as conn:
+
         # =========================
         # MOVIMIENTOS
         # =========================
@@ -67,22 +64,13 @@ def run_startup_migrations() -> None:
         except Exception:
             pass
 
-        # =========================
-        # REQUISICIONES
-        # =========================
-        # Estas tablas normalmente las crea Base.metadata.create_all()
-        # pero dejamos este espacio por si luego quieres migraciones ligeras.
         conn.commit()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Crear tablas nuevas que estén registradas en modelos
     Base.metadata.create_all(bind=engine)
-
-    # Correr migraciones ligeras
     run_startup_migrations()
-
     yield
 
 
@@ -93,13 +81,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# =========================
+# CORS (AQUÍ ESTÁ LA CLAVE 🔥)
+# =========================
 origins = [
     "http://localhost:5500",
     "http://127.0.0.1:5500",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://mexa-core-1.onrender.com",
+    "https://mexa-frontend.onrender.com",  # 👈 ESTE ES EL IMPORTANTE
 ]
 
 app.add_middleware(
