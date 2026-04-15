@@ -19,7 +19,7 @@ def crear_usuario(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_admin)
 ):
-    if data.rol not in ["admin", "usuario"]:
+    if data.rol not in ["superadmin", "admin", "usuario"]:
         raise HTTPException(status_code=400, detail="Rol inválido")
 
     organizacion = db.query(Organizacion).filter(
@@ -29,11 +29,18 @@ def crear_usuario(
     if not organizacion:
         raise HTTPException(status_code=404, detail="Organización no encontrada")
 
-    if data.organizacion_id != current_user.organizacion_id:
-        raise HTTPException(
-            status_code=403,
-            detail="Solo puedes crear usuarios en tu organización"
-        )
+    if current_user.rol == "admin":
+        if data.organizacion_id != current_user.organizacion_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Solo puedes crear usuarios en tu organización"
+            )
+
+        if data.rol == "superadmin":
+            raise HTTPException(
+                status_code=403,
+                detail="Un admin no puede crear superadmin"
+            )
 
     usuario_existente = db.query(Usuario).filter(
         Usuario.email == data.email
@@ -62,12 +69,16 @@ def listar_usuarios(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_admin)
 ):
-    usuarios = (
-        db.query(Usuario)
-        .filter(Usuario.organizacion_id == current_user.organizacion_id)
-        .order_by(Usuario.id.desc())
-        .all()
-    )
+    if current_user.rol == "superadmin":
+        usuarios = db.query(Usuario).order_by(Usuario.id.desc()).all()
+    else:
+        usuarios = (
+            db.query(Usuario)
+            .filter(Usuario.organizacion_id == current_user.organizacion_id)
+            .order_by(Usuario.id.desc())
+            .all()
+        )
+
     return usuarios
 
 
@@ -77,16 +88,13 @@ def obtener_usuario(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_admin)
 ):
-    usuario = (
-        db.query(Usuario)
-        .filter(
-            Usuario.id == usuario_id,
-            Usuario.organizacion_id == current_user.organizacion_id
-        )
-        .first()
-    )
+    usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
 
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    if current_user.rol != "superadmin":
+        if usuario.organizacion_id != current_user.organizacion_id:
+            raise HTTPException(status_code=403, detail="No puedes ver este usuario")
 
     return usuario
