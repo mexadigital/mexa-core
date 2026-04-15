@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.sql import func
+from sqlalchemy import Column, Integer, String, DateTime, func
+
 from app.db.base import Base
 
 
@@ -8,6 +8,8 @@ class Organizacion(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String, unique=True, nullable=False, index=True)
-    rfc = Column(String, nullable=True)
-    plan = Column(String, nullable=False, default="basic")
+    rfc = Column(String, unique=True, nullable=False, index=True)
+    plan = Column(String, nullable=False, default="free")
+    tipo = Column(String, nullable=False, default="control")  # control | retail
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
