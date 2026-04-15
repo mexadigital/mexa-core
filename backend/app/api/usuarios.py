@@ -8,7 +8,7 @@ from app.models.usuario import Usuario
 from app.models.organizacion import Organizacion
 from app.schemas.usuario import UsuarioCreate, UsuarioOut
 from app.core.security import hash_password
-from app.core.deps import get_current_user, require_admin
+from app.core.deps import require_admin
 
 router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 
@@ -29,7 +29,15 @@ def crear_usuario(
     if not organizacion:
         raise HTTPException(status_code=404, detail="Organización no encontrada")
 
-    usuario_existente = db.query(Usuario).filter(Usuario.email == data.email).first()
+    if data.organizacion_id != current_user.organizacion_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Solo puedes crear usuarios en tu organización"
+        )
+
+    usuario_existente = db.query(Usuario).filter(
+        Usuario.email == data.email
+    ).first()
     if usuario_existente:
         raise HTTPException(status_code=400, detail="El email ya está registrado")
 
@@ -54,10 +62,12 @@ def listar_usuarios(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_admin)
 ):
-    usuarios = db.query(Usuario).filter(
-        Usuario.organizacion_id == current_user.organizacion_id
-    ).order_by(Usuario.id.desc()).all()
-
+    usuarios = (
+        db.query(Usuario)
+        .filter(Usuario.organizacion_id == current_user.organizacion_id)
+        .order_by(Usuario.id.desc())
+        .all()
+    )
     return usuarios
 
 
@@ -67,10 +77,14 @@ def obtener_usuario(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_admin)
 ):
-    usuario = db.query(Usuario).filter(
-        Usuario.id == usuario_id,
-        Usuario.organizacion_id == current_user.organizacion_id
-    ).first()
+    usuario = (
+        db.query(Usuario)
+        .filter(
+            Usuario.id == usuario_id,
+            Usuario.organizacion_id == current_user.organizacion_id
+        )
+        .first()
+    )
 
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
