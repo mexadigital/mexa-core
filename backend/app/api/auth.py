@@ -23,7 +23,7 @@ def register(data: UsuarioCreate, db: Session = Depends(get_db)):
     if not organizacion:
         raise HTTPException(status_code=404, detail="Organización no encontrada")
 
-    if data.rol not in ["admin", "usuario"]:
+    if data.rol not in ["superadmin", "admin", "usuario"]:
         raise HTTPException(status_code=400, detail="Rol inválido")
 
     nuevo_usuario = Usuario(
