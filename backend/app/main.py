@@ -23,13 +23,11 @@ from app.api.usuarios import router as usuarios_router
 
 def run_startup_migrations():
     with engine.connect() as conn:
-        # ORGANIZACIONES
         conn.execute(text("""
             ALTER TABLE organizaciones
             ADD COLUMN IF NOT EXISTS tipo VARCHAR DEFAULT 'control';
         """))
 
-        # USUARIOS
         conn.execute(text("""
             ALTER TABLE usuarios
             ADD COLUMN IF NOT EXISTS rol VARCHAR DEFAULT 'usuario';
@@ -43,7 +41,6 @@ def run_startup_migrations():
             ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
         """))
 
-        # MOVIMIENTOS
         conn.execute(text("""
             ALTER TABLE movimientos
             ADD COLUMN IF NOT EXISTS recibe VARCHAR;
@@ -57,7 +54,6 @@ def run_startup_migrations():
             ADD COLUMN IF NOT EXISTS nota VARCHAR;
         """))
 
-        # VENTAS
         conn.execute(text("""
             ALTER TABLE ventas
             ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
