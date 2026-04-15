@@ -8,10 +8,8 @@ from app.core.config import settings
 from app.db.database import engine
 from app.db.base import Base
 
-# Registrar modelos
 import app.models  # noqa: F401
 
-# Routers
 from app.api.auth import router as auth_router
 from app.api.organizaciones.router import router as organizaciones_router
 from app.api.productos import router as productos_router
@@ -25,6 +23,12 @@ from app.api.usuarios import router as usuarios_router
 
 def run_startup_migrations():
     with engine.connect() as conn:
+        # ORGANIZACIONES
+        conn.execute(text("""
+            ALTER TABLE organizaciones
+            ADD COLUMN IF NOT EXISTS tipo VARCHAR DEFAULT 'control';
+        """))
+
         # USUARIOS
         conn.execute(text("""
             ALTER TABLE usuarios
