@@ -54,9 +54,18 @@ def get_current_user(
 
 
 def require_admin(current_user: Usuario = Depends(get_current_user)) -> Usuario:
-    if current_user.rol != "admin":
+    if current_user.rol not in ["superadmin", "admin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Solo admin puede hacer esta acción"
+            detail="Solo admin o superadmin puede hacer esta acción"
+        )
+    return current_user
+
+
+def require_superadmin(current_user: Usuario = Depends(get_current_user)) -> Usuario:
+    if current_user.rol != "superadmin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo superadmin puede hacer esta acción"
         )
     return current_user
