@@ -16,6 +16,11 @@ class UsuarioLogin(BaseModel):
     password: str
 
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
 class UsuarioOut(BaseModel):
     id: int
     organizacion_id: int
@@ -29,11 +34,6 @@ class UsuarioOut(BaseModel):
         from_attributes = True
 
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-
-
 class UsuarioMe(BaseModel):
     id: int
     organizacion_id: int
@@ -41,6 +41,8 @@ class UsuarioMe(BaseModel):
     email: EmailStr
     rol: str
     activo: str
+    organizacion_nombre: str
+    organizacion_tipo: str
 
     class Config:
         from_attributes = True
