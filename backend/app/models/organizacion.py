@@ -10,6 +10,6 @@ class Organizacion(Base):
     nombre = Column(String, unique=True, nullable=False, index=True)
     rfc = Column(String, unique=True, nullable=False, index=True)
     plan = Column(String, nullable=False, default="free")
-    tipo = Column(String, nullable=False, default="control")  # control | retail
+    tipo = Column(String, nullable=False, default="control")
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
