@@ -5,8 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.db.base import Base
 from app.db.database import engine
+from app.db.base import Base
 
 # Registrar modelos
 import app.models  # noqa: F401
@@ -20,49 +20,44 @@ from app.api.ubicaciones import router as ubicaciones_router
 from app.api.inventario_ubicaciones import router as inventario_ubicaciones_router
 from app.api.traspasos import router as traspasos_router
 from app.api.ventas import router as ventas_router
-from app.api.requisiciones import router as requisiciones_router
+from app.api.usuarios import router as usuarios_router
 
 
-def run_startup_migrations() -> None:
+def run_startup_migrations():
     with engine.connect() as conn:
+        # USUARIOS
+        conn.execute(text("""
+            ALTER TABLE usuarios
+            ADD COLUMN IF NOT EXISTS rol VARCHAR DEFAULT 'usuario';
+        """))
+        conn.execute(text("""
+            ALTER TABLE usuarios
+            ADD COLUMN IF NOT EXISTS activo VARCHAR DEFAULT 'si';
+        """))
+        conn.execute(text("""
+            ALTER TABLE usuarios
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+        """))
 
-        # =========================
         # MOVIMIENTOS
-        # =========================
-        try:
-            conn.execute(text("""
-                ALTER TABLE movimientos
-                ADD COLUMN IF NOT EXISTS recibe VARCHAR;
-            """))
-        except Exception:
-            pass
+        conn.execute(text("""
+            ALTER TABLE movimientos
+            ADD COLUMN IF NOT EXISTS recibe VARCHAR;
+        """))
+        conn.execute(text("""
+            ALTER TABLE movimientos
+            ADD COLUMN IF NOT EXISTS empleado VARCHAR;
+        """))
+        conn.execute(text("""
+            ALTER TABLE movimientos
+            ADD COLUMN IF NOT EXISTS nota VARCHAR;
+        """))
 
-        try:
-            conn.execute(text("""
-                ALTER TABLE movimientos
-                ADD COLUMN IF NOT EXISTS empleado VARCHAR;
-            """))
-        except Exception:
-            pass
-
-        try:
-            conn.execute(text("""
-                ALTER TABLE movimientos
-                ADD COLUMN IF NOT EXISTS nota TEXT;
-            """))
-        except Exception:
-            pass
-
-        # =========================
-        # UBICACIONES
-        # =========================
-        try:
-            conn.execute(text("""
-                ALTER TABLE ubicaciones
-                ADD COLUMN IF NOT EXISTS activo BOOLEAN DEFAULT TRUE;
-            """))
-        except Exception:
-            pass
+        # VENTAS
+        conn.execute(text("""
+            ALTER TABLE ventas
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+        """))
 
         conn.commit()
 
@@ -78,56 +73,32 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     debug=settings.DEBUG,
-    lifespan=lifespan,
+    lifespan=lifespan
 )
-
-# =========================
-# CORS (AQUÍ ESTÁ LA CLAVE 🔥)
-# =========================
-origins = [
-    "http://localhost:5500",
-    "http://127.0.0.1:5500",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://mexa-core-1.onrender.com",
-    "https://mexa-frontend.onrender.com",  # 👈 ESTE ES EL IMPORTANTE
-]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=[
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+        "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# =========================
-# RUTAS BASE
-# =========================
 @app.get("/")
 def root():
-    return {
-        "message": "Mexa Core API funcionando",
-        "app": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "docs": "/docs",
-    }
+    return {"message": "Mexa.Digital API activa"}
 
 
 @app.get("/health")
 def health():
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return {"status": "ok", "database": "connected"}
-    except Exception as e:
-        return {"status": "error", "database": str(e)}
+    return {"status": "ok"}
 
 
-# =========================
-# ROUTERS
-# =========================
 app.include_router(auth_router)
 app.include_router(organizaciones_router)
 app.include_router(productos_router)
@@ -136,4 +107,4 @@ app.include_router(ubicaciones_router)
 app.include_router(inventario_ubicaciones_router)
 app.include_router(traspasos_router)
 app.include_router(ventas_router)
-app.include_router(requisiciones_router)
+app.include_router(usuarios_router)
