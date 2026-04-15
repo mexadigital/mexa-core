@@ -1,19 +1,22 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
 
 class OrganizacionCreate(BaseModel):
     nombre: str
-    rfc: Optional[str] = None
+    rfc: str
     plan: str = "free"
+    tipo: str = "control"
 
 
 class OrganizacionOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
     nombre: str
-    rfc: Optional[str] = None
+    rfc: str
     plan: str
-    created_at: datetime
+    tipo: str
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
