@@ -23,37 +23,83 @@ from app.api.usuarios import router as usuarios_router
 
 def run_startup_migrations():
     with engine.connect() as conn:
+        # =========================
+        # ORGANIZACIONES
+        # =========================
         conn.execute(text("""
             ALTER TABLE organizaciones
             ADD COLUMN IF NOT EXISTS tipo VARCHAR DEFAULT 'control';
         """))
 
         conn.execute(text("""
+            UPDATE organizaciones
+            SET rfc = 'PENDIENTE'
+            WHERE rfc IS NULL;
+        """))
+
+        conn.execute(text("""
+            UPDATE organizaciones
+            SET plan = 'free'
+            WHERE plan IS NULL;
+        """))
+
+        conn.execute(text("""
+            UPDATE organizaciones
+            SET tipo = 'control'
+            WHERE tipo IS NULL;
+        """))
+
+        # =========================
+        # USUARIOS
+        # =========================
+        conn.execute(text("""
             ALTER TABLE usuarios
             ADD COLUMN IF NOT EXISTS rol VARCHAR DEFAULT 'usuario';
         """))
+
         conn.execute(text("""
             ALTER TABLE usuarios
             ADD COLUMN IF NOT EXISTS activo VARCHAR DEFAULT 'si';
         """))
+
         conn.execute(text("""
             ALTER TABLE usuarios
             ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
         """))
 
         conn.execute(text("""
+            UPDATE usuarios
+            SET rol = 'usuario'
+            WHERE rol IS NULL;
+        """))
+
+        conn.execute(text("""
+            UPDATE usuarios
+            SET activo = 'si'
+            WHERE activo IS NULL;
+        """))
+
+        # =========================
+        # MOVIMIENTOS
+        # =========================
+        conn.execute(text("""
             ALTER TABLE movimientos
             ADD COLUMN IF NOT EXISTS recibe VARCHAR;
         """))
+
         conn.execute(text("""
             ALTER TABLE movimientos
             ADD COLUMN IF NOT EXISTS empleado VARCHAR;
         """))
+
         conn.execute(text("""
             ALTER TABLE movimientos
             ADD COLUMN IF NOT EXISTS nota VARCHAR;
         """))
 
+        # =========================
+        # VENTAS
+        # =========================
         conn.execute(text("""
             ALTER TABLE ventas
             ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
@@ -81,6 +127,7 @@ app.add_middleware(
     allow_origins=[
         "http://127.0.0.1:5500",
         "http://localhost:5500",
+        "https://mexa-frontend.onrender.com",
         "*"
     ],
     allow_credentials=True,
