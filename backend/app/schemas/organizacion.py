@@ -13,9 +13,9 @@ class OrganizacionCreate(BaseModel):
 class OrganizacionOut(BaseModel):
     id: int
     nombre: str
-    rfc: str
-    plan: str
-    tipo: str
+    rfc: Optional[str] = None
+    plan: Optional[str] = "free"
+    tipo: Optional[str] = "control"
     created_at: Optional[datetime] = None
 
     class Config:
