@@ -1,17 +1,12 @@
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 
 
 class UbicacionCreate(BaseModel):
+    organizacion_id: int
     nombre: str
-    tipo: str
-    activo: Optional[bool] = True
-
-
-class UbicacionUpdate(BaseModel):
-    nombre: Optional[str] = None
-    tipo: Optional[str] = None
-    activo: Optional[bool] = None
+    tipo: str = "sucursal"
 
 
 class UbicacionOut(BaseModel):
@@ -20,6 +15,7 @@ class UbicacionOut(BaseModel):
     nombre: str
     tipo: str
     activo: bool
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
