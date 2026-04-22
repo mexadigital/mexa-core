@@ -17,11 +17,12 @@ def crear_movimiento(
     db: Session = Depends(get_db),
     user: Usuario = Depends(get_current_user),
 ):
+    # 🔹 Buscar producto dentro de la organización
     producto = (
         db.query(Producto)
         .filter(
             Producto.id == data.producto_id,
-            Producto.organizacion_id == user.organizacion_id,
+            Producto.organizacion_id == user.organizacion_id,  # 🔥 FIX AQUÍ
         )
         .first()
     )
@@ -30,21 +31,24 @@ def crear_movimiento(
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
     if data.tipo not in ["entrada", "salida"]:
-        raise HTTPException(status_code=400, detail="Tipo de movimiento inválido")
+        raise HTTPException(status_code=400, detail="Tipo inválido")
 
     if data.cantidad <= 0:
-        raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a cero")
+        raise HTTPException(status_code=400, detail="Cantidad debe ser mayor a 0")
 
+    # 🔹 Validar stock
     if data.tipo == "salida" and producto.cantidad < data.cantidad:
         raise HTTPException(status_code=400, detail="Stock insuficiente")
 
+    # 🔹 Aplicar movimiento
     if data.tipo == "entrada":
         producto.cantidad += data.cantidad
     else:
         producto.cantidad -= data.cantidad
 
+    # 🔹 Crear registro
     nuevo_movimiento = Movimiento(
-        organizacion_id=user.organizacion_id,
+        organizacion_id=user.organizacion_id,  # 🔥 FIX AQUÍ
         producto_id=data.producto_id,
         tipo=data.tipo,
         cantidad=data.cantidad,
@@ -68,7 +72,7 @@ def listar_movimientos(
 ):
     movimientos = (
         db.query(Movimiento)
-        .filter(Movimiento.organizacion_id == user.organizacion_id)
+        .filter(Movimiento.organizacion_id == user.organizacion_id)  # 🔥 FIX AQUÍ
         .order_by(Movimiento.id.desc())
         .all()
     )
