@@ -5,24 +5,24 @@ from app.db.database import get_db
 from app.models.movimiento import Movimiento
 from app.models.producto import Producto
 from app.models.usuario import Usuario
-from app.schemas.movimiento import MovimientoCreate, MovimientoOut
+from app.schemas.movimiento import MovimientoCreate
 from app.api.auth import get_current_user
 
 router = APIRouter(prefix="/movimientos", tags=["Movimientos"])
 
 
-@router.post("/", response_model=MovimientoOut, status_code=status.HTTP_201_CREATED)
+# 🔹 CREAR MOVIMIENTO
+@router.post("/", status_code=status.HTTP_201_CREATED)
 def crear_movimiento(
     data: MovimientoCreate,
     db: Session = Depends(get_db),
     user: Usuario = Depends(get_current_user),
 ):
-    # 🔹 Buscar producto dentro de la organización
     producto = (
         db.query(Producto)
         .filter(
             Producto.id == data.producto_id,
-            Producto.organizacion_id == user.organizacion_id,  # 🔥 FIX AQUÍ
+            Producto.organizacion_id == user.organizacion_id
         )
         .first()
     )
@@ -36,19 +36,17 @@ def crear_movimiento(
     if data.cantidad <= 0:
         raise HTTPException(status_code=400, detail="Cantidad debe ser mayor a 0")
 
-    # 🔹 Validar stock
     if data.tipo == "salida" and producto.cantidad < data.cantidad:
         raise HTTPException(status_code=400, detail="Stock insuficiente")
 
-    # 🔹 Aplicar movimiento
+    # 🔹 Ajuste de stock
     if data.tipo == "entrada":
         producto.cantidad += data.cantidad
     else:
         producto.cantidad -= data.cantidad
 
-    # 🔹 Crear registro
     nuevo_movimiento = Movimiento(
-        organizacion_id=user.organizacion_id,  # 🔥 FIX AQUÍ
+        organizacion_id=user.organizacion_id,
         producto_id=data.producto_id,
         tipo=data.tipo,
         cantidad=data.cantidad,
@@ -65,16 +63,33 @@ def crear_movimiento(
     return nuevo_movimiento
 
 
-@router.get("/", response_model=list[MovimientoOut])
+# 🔹 LISTAR MOVIMIENTOS (YA CON NOMBRE DE PRODUCTO)
+@router.get("/")
 def listar_movimientos(
     db: Session = Depends(get_db),
     user: Usuario = Depends(get_current_user),
 ):
     movimientos = (
-        db.query(Movimiento)
-        .filter(Movimiento.organizacion_id == user.organizacion_id)  # 🔥 FIX AQUÍ
+        db.query(Movimiento, Producto)
+        .join(Producto, Movimiento.producto_id == Producto.id)
+        .filter(Movimiento.organizacion_id == user.organizacion_id)
         .order_by(Movimiento.id.desc())
         .all()
     )
 
-    return movimientos
+    resultado = []
+
+    for mov, prod in movimientos:
+        resultado.append({
+            "id": mov.id,
+            "producto": prod.nombre,
+            "tipo": mov.tipo,
+            "cantidad": mov.cantidad,
+            "usuario": mov.usuario,
+            "recibe": mov.recibe,
+            "empleado": mov.empleado,
+            "nota": mov.nota,
+            "created_at": mov.created_at
+        })
+
+    return resultado
