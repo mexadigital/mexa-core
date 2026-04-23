@@ -63,7 +63,7 @@ def crear_movimiento(
     return nuevo_movimiento
 
 
-# 🔹 LISTAR MOVIMIENTOS (YA CON NOMBRE DE PRODUCTO)
+# 🔹 LISTAR MOVIMIENTOS (CON NOMBRE DE PRODUCTO)
 @router.get("/")
 def listar_movimientos(
     db: Session = Depends(get_db),
@@ -91,5 +91,41 @@ def listar_movimientos(
             "nota": mov.nota,
             "created_at": mov.created_at
         })
+
+    return resultado
+
+
+# 🔹 HERRAMIENTAS PRESTADAS (QUIÉN TIENE QUÉ)
+@router.get("/prestadas")
+def herramientas_prestadas(
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    movimientos = (
+        db.query(Movimiento, Producto)
+        .join(Producto, Movimiento.producto_id == Producto.id)
+        .filter(Movimiento.organizacion_id == user.organizacion_id)
+        .order_by(Movimiento.created_at.desc())
+        .all()
+    )
+
+    estado = {}
+
+    for mov, prod in movimientos:
+        key = mov.producto_id
+
+        if key not in estado:
+            if mov.tipo == "salida":
+                estado[key] = {
+                    "producto": prod.nombre,
+                    "cantidad": mov.cantidad,
+                    "recibe": mov.recibe,
+                    "empleado": mov.empleado,
+                    "fecha": mov.created_at
+                }
+            elif mov.tipo == "entrada":
+                estado[key] = None
+
+    resultado = [v for v in estado.values() if v is not None]
 
     return resultado
