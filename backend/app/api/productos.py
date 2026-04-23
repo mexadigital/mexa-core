@@ -10,13 +10,13 @@ from app.api.auth import get_current_user
 router = APIRouter(prefix="/productos", tags=["Productos"])
 
 
+# 🔹 CREAR PRODUCTO
 @router.post("/", response_model=ProductoOut, status_code=status.HTTP_201_CREATED)
 def crear_producto(
     data: ProductoCreate,
     db: Session = Depends(get_db),
     user: Usuario = Depends(get_current_user),
 ):
-    # Validar código único dentro de la organización
     existente = (
         db.query(Producto)
         .filter(
@@ -45,23 +45,30 @@ def crear_producto(
     db.add(nuevo_producto)
     db.commit()
     db.refresh(nuevo_producto)
+
     return nuevo_producto
 
 
+# 🔹 LISTAR PRODUCTOS (CON BÚSQUEDA)
 @router.get("/", response_model=list[ProductoOut])
 def listar_productos(
+    q: str = None,
     db: Session = Depends(get_db),
     user: Usuario = Depends(get_current_user),
 ):
-    productos = (
-        db.query(Producto)
-        .filter(Producto.organizacion_id == user.organizacion_id)
-        .order_by(Producto.id.desc())
-        .all()
+    query = db.query(Producto).filter(
+        Producto.organizacion_id == user.organizacion_id
     )
+
+    if q:
+        query = query.filter(Producto.nombre.ilike(f"%{q}%"))
+
+    productos = query.order_by(Producto.id.desc()).all()
+
     return productos
 
 
+# 🔹 OBTENER PRODUCTO
 @router.get("/{producto_id}", response_model=ProductoOut)
 def obtener_producto(
     producto_id: int,
@@ -83,6 +90,7 @@ def obtener_producto(
     return producto
 
 
+# 🔹 ACTUALIZAR PRODUCTO
 @router.put("/{producto_id}", response_model=ProductoOut)
 def actualizar_producto(
     producto_id: int,
@@ -102,7 +110,6 @@ def actualizar_producto(
     if not producto:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    # Si quieren cambiar el código, validar que no se repita en la organización
     if data.codigo and data.codigo != producto.codigo:
         existente = (
             db.query(Producto)
@@ -119,7 +126,6 @@ def actualizar_producto(
                 detail="Ya existe otro producto con ese código en tu organización",
             )
 
-    # Actualización parcial
     if data.nombre is not None:
         producto.nombre = data.nombre
     if data.codigo is not None:
@@ -135,9 +141,11 @@ def actualizar_producto(
 
     db.commit()
     db.refresh(producto)
+
     return producto
 
 
+# 🔹 ELIMINAR PRODUCTO
 @router.delete("/{producto_id}")
 def eliminar_producto(
     producto_id: int,
