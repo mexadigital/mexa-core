@@ -8,8 +8,10 @@ from app.core.config import settings
 from app.db.database import engine
 from app.db.base import Base
 
+# Registrar modelos
 import app.models  # noqa: F401
 
+# Routers
 from app.api.auth import router as auth_router
 from app.api.organizaciones.router import router as organizaciones_router
 from app.api.productos import router as productos_router
@@ -18,66 +20,10 @@ from app.api.ubicaciones import router as ubicaciones_router
 from app.api.inventario_ubicaciones import router as inventario_ubicaciones_router
 from app.api.traspasos import router as traspasos_router
 from app.api.ventas import router as ventas_router
-from app.api.usuarios import router as usuarios_router
 
 
 def run_startup_migrations():
     with engine.connect() as conn:
-        # =========================
-        # ORGANIZACIONES
-        # =========================
-        conn.execute(text("""
-            ALTER TABLE organizaciones
-            ADD COLUMN IF NOT EXISTS tipo VARCHAR DEFAULT 'control';
-        """))
-
-        conn.execute(text("""
-            UPDATE organizaciones
-            SET rfc = 'PENDIENTE'
-            WHERE rfc IS NULL;
-        """))
-
-        conn.execute(text("""
-            UPDATE organizaciones
-            SET plan = 'free'
-            WHERE plan IS NULL;
-        """))
-
-        conn.execute(text("""
-            UPDATE organizaciones
-            SET tipo = 'control'
-            WHERE tipo IS NULL;
-        """))
-
-        # =========================
-        # USUARIOS
-        # =========================
-        conn.execute(text("""
-            ALTER TABLE usuarios
-            ADD COLUMN IF NOT EXISTS rol VARCHAR DEFAULT 'usuario';
-        """))
-
-        conn.execute(text("""
-            ALTER TABLE usuarios
-            ADD COLUMN IF NOT EXISTS activo VARCHAR DEFAULT 'si';
-        """))
-
-        conn.execute(text("""
-            ALTER TABLE usuarios
-            ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
-        """))
-
-        conn.execute(text("""
-            UPDATE usuarios
-            SET rol = 'usuario'
-            WHERE rol IS NULL;
-        """))
-
-        conn.execute(text("""
-            UPDATE usuarios
-            SET activo = 'si'
-            WHERE activo IS NULL;
-        """))
 
         # =========================
         # MOVIMIENTOS
@@ -98,11 +44,19 @@ def run_startup_migrations():
         """))
 
         # =========================
-        # VENTAS
+        # UBICACIONES (FIX ERROR)
+        # =========================
+        conn.execute(text("""
+            ALTER TABLE ubicaciones
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+        """))
+
+        # =========================
+        # VENTAS (por si falla deploy)
         # =========================
         conn.execute(text("""
             ALTER TABLE ventas
-            ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+            ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
         """))
 
         conn.commit()
@@ -110,8 +64,12 @@ def run_startup_migrations():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Crear tablas si no existen
     Base.metadata.create_all(bind=engine)
+
+    # Ejecutar migraciones
     run_startup_migrations()
+
     yield
 
 
@@ -122,36 +80,44 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# =========================
+# CORS
+# =========================
+origins = [
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://mexa-frontend.onrender.com"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5500",
-        "http://localhost:5500",
-        "https://mexa-frontend.onrender.com",
-        "*"
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# =========================
+# ROUTERS
+# =========================
+app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(organizaciones_router, prefix="/organizaciones", tags=["Organizaciones"])
+app.include_router(productos_router, prefix="/productos", tags=["Productos"])
+app.include_router(movimientos_router, prefix="/movimientos", tags=["Movimientos"])
+app.include_router(ubicaciones_router, prefix="/ubicaciones", tags=["Ubicaciones"])
+app.include_router(inventario_ubicaciones_router, prefix="/inventario-ubicaciones", tags=["Inventario Ubicaciones"])
+app.include_router(traspasos_router, prefix="/traspasos", tags=["Traspasos"])
+app.include_router(ventas_router, prefix="/ventas", tags=["Ventas"])
 
+# =========================
+# HEALTH CHECK
+# =========================
 @app.get("/")
 def root():
-    return {"message": "Mexa.Digital API activa"}
-
+    return {"message": "Mexa Core funcionando 🚀"}
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
-
-app.include_router(auth_router)
-app.include_router(organizaciones_router)
-app.include_router(productos_router)
-app.include_router(movimientos_router)
-app.include_router(ubicaciones_router)
-app.include_router(inventario_ubicaciones_router)
-app.include_router(traspasos_router)
-app.include_router(ventas_router)
-app.include_router(usuarios_router)
