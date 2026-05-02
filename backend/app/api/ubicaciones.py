@@ -73,3 +73,28 @@ def obtener_ubicacion(
             raise HTTPException(status_code=403, detail="No puedes ver esta ubicación")
 
     return ubicacion
+
+
+# 🔥 NUEVO ENDPOINT DELETE
+@router.delete("/{ubicacion_id}")
+def eliminar_ubicacion(
+    ubicacion_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin)
+):
+    ubicacion = db.query(Ubicacion).filter(Ubicacion.id == ubicacion_id).first()
+
+    if not ubicacion:
+        raise HTTPException(status_code=404, detail="Ubicación no encontrada")
+
+    if current_user.rol != "superadmin":
+        if ubicacion.organizacion_id != current_user.organizacion_id:
+            raise HTTPException(
+                status_code=403,
+                detail="No puedes eliminar esta ubicación"
+            )
+
+    db.delete(ubicacion)
+    db.commit()
+
+    return {"message": "Ubicación eliminada correctamente", "id": ubicacion_id}
