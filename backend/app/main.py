@@ -1,15 +1,21 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.database import engine
+from app.db.database import engine, get_db
 from app.db.base import Base
 
 # Registrar modelos
 import app.models  # noqa: F401
+
+from app.models.producto import Producto
+from app.models.usuario import Usuario
+from app.schemas.producto import ProductoCreate, ProductoOut
+from app.api.auth import get_current_user
 
 # Routers
 from app.api.auth import router as auth_router
@@ -24,10 +30,6 @@ from app.api.ventas import router as ventas_router
 
 def run_startup_migrations():
     with engine.connect() as conn:
-
-        # =========================
-        # MOVIMIENTOS
-        # =========================
         conn.execute(text("""
             ALTER TABLE movimientos
             ADD COLUMN IF NOT EXISTS recibe VARCHAR;
@@ -43,17 +45,11 @@ def run_startup_migrations():
             ADD COLUMN IF NOT EXISTS nota VARCHAR;
         """))
 
-        # =========================
-        # UBICACIONES
-        # =========================
         conn.execute(text("""
             ALTER TABLE ubicaciones
             ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
         """))
 
-        # =========================
-        # VENTAS
-        # =========================
         conn.execute(text("""
             ALTER TABLE ventas
             ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
@@ -76,9 +72,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# =========================
-# CORS
-# =========================
 origins = [
     "http://localhost:5500",
     "http://127.0.0.1:5500",
@@ -100,20 +93,55 @@ app.add_middleware(
 # =========================
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(organizaciones_router, prefix="/organizaciones", tags=["Organizaciones"])
-
-# ✅ PRODUCTOS CORREGIDO
-# El router de productos YA trae prefix="/productos"
 app.include_router(productos_router)
-
 app.include_router(movimientos_router, prefix="/movimientos", tags=["Movimientos"])
 app.include_router(ubicaciones_router, prefix="/ubicaciones", tags=["Ubicaciones"])
 app.include_router(inventario_ubicaciones_router, prefix="/inventario-ubicaciones", tags=["Inventario Ubicaciones"])
 app.include_router(traspasos_router, prefix="/traspasos", tags=["Traspasos"])
 app.include_router(ventas_router, prefix="/ventas", tags=["Ventas"])
 
+
 # =========================
-# HEALTH CHECK
+# RUTA DE EMERGENCIA PRODUCTOS
 # =========================
+@app.post("/productos/productos/", response_model=ProductoOut, status_code=status.HTTP_201_CREATED)
+def crear_producto_emergencia(
+    data: ProductoCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    existente = (
+        db.query(Producto)
+        .filter(
+            Producto.organizacion_id == user.organizacion_id,
+            Producto.codigo == data.codigo,
+        )
+        .first()
+    )
+
+    if existente:
+        raise HTTPException(
+            status_code=400,
+            detail="Ya existe un producto con ese código en tu organización",
+        )
+
+    nuevo_producto = Producto(
+        organizacion_id=user.organizacion_id,
+        nombre=data.nombre,
+        codigo=data.codigo,
+        tipo=data.tipo,
+        cantidad=data.cantidad,
+        ubicacion=data.ubicacion,
+        precio=data.precio,
+    )
+
+    db.add(nuevo_producto)
+    db.commit()
+    db.refresh(nuevo_producto)
+
+    return nuevo_producto
+
+
 @app.get("/")
 def root():
     return {"message": "Mexa Core funcionando 🚀"}
