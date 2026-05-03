@@ -44,7 +44,7 @@ def run_startup_migrations():
         """))
 
         # =========================
-        # UBICACIONES (FIX ERROR)
+        # UBICACIONES
         # =========================
         conn.execute(text("""
             ALTER TABLE ubicaciones
@@ -52,7 +52,7 @@ def run_startup_migrations():
         """))
 
         # =========================
-        # VENTAS (por si falla deploy)
+        # VENTAS
         # =========================
         conn.execute(text("""
             ALTER TABLE ventas
@@ -64,12 +64,8 @@ def run_startup_migrations():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Crear tablas si no existen
     Base.metadata.create_all(bind=engine)
-
-    # Ejecutar migraciones
     run_startup_migrations()
-
     yield
 
 
@@ -104,7 +100,11 @@ app.add_middleware(
 # =========================
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(organizaciones_router, prefix="/organizaciones", tags=["Organizaciones"])
-app.include_router(productos_router, prefix="/productos", tags=["Productos"])
+
+# ✅ PRODUCTOS CORREGIDO
+# El router de productos YA trae prefix="/productos"
+app.include_router(productos_router)
+
 app.include_router(movimientos_router, prefix="/movimientos", tags=["Movimientos"])
 app.include_router(ubicaciones_router, prefix="/ubicaciones", tags=["Ubicaciones"])
 app.include_router(inventario_ubicaciones_router, prefix="/inventario-ubicaciones", tags=["Inventario Ubicaciones"])
@@ -117,6 +117,7 @@ app.include_router(ventas_router, prefix="/ventas", tags=["Ventas"])
 @app.get("/")
 def root():
     return {"message": "Mexa Core funcionando 🚀"}
+
 
 @app.get("/health")
 def health():
