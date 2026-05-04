@@ -18,7 +18,6 @@ def crear_ubicacion(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_admin)
 ):
-    # Evitar duplicados dentro de la misma organización
     existente = (
         db.query(Ubicacion)
         .filter(
@@ -77,7 +76,10 @@ def obtener_ubicacion(
 
     if current_user.rol != "superadmin":
         if ubicacion.organizacion_id != current_user.organizacion_id:
-            raise HTTPException(status_code=403, detail="No puedes ver esta ubicación")
+            raise HTTPException(
+                status_code=403,
+                detail="No puedes ver esta ubicación"
+            )
 
     return ubicacion
 
@@ -103,4 +105,7 @@ def eliminar_ubicacion(
     db.delete(ubicacion)
     db.commit()
 
-    return {"message": "Ubicación eliminada correctamente", "id": ubicacion_id}
+    return {
+        "message": "Ubicación eliminada correctamente",
+        "id": ubicacion_id
+    }
