@@ -18,15 +18,24 @@ def crear_ubicacion(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_admin)
 ):
-    if current_user.rol != "superadmin":
-        if data.organizacion_id != current_user.organizacion_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Solo puedes crear ubicaciones en tu organización"
-            )
+    # Evitar duplicados dentro de la misma organización
+    existente = (
+        db.query(Ubicacion)
+        .filter(
+            Ubicacion.organizacion_id == current_user.organizacion_id,
+            Ubicacion.nombre == data.nombre
+        )
+        .first()
+    )
+
+    if existente:
+        raise HTTPException(
+            status_code=400,
+            detail="Ya existe una ubicación con ese nombre en tu organización"
+        )
 
     nueva = Ubicacion(
-        organizacion_id=data.organizacion_id,
+        organizacion_id=current_user.organizacion_id,
         nombre=data.nombre,
         tipo=data.tipo,
         activo=True
@@ -45,16 +54,14 @@ def listar_ubicaciones(
     current_user: Usuario = Depends(get_current_user)
 ):
     if current_user.rol == "superadmin":
-        ubicaciones = db.query(Ubicacion).order_by(Ubicacion.id.desc()).all()
-    else:
-        ubicaciones = (
-            db.query(Ubicacion)
-            .filter(Ubicacion.organizacion_id == current_user.organizacion_id)
-            .order_by(Ubicacion.id.desc())
-            .all()
-        )
+        return db.query(Ubicacion).order_by(Ubicacion.id.desc()).all()
 
-    return ubicaciones
+    return (
+        db.query(Ubicacion)
+        .filter(Ubicacion.organizacion_id == current_user.organizacion_id)
+        .order_by(Ubicacion.id.desc())
+        .all()
+    )
 
 
 @router.get("/{ubicacion_id}", response_model=UbicacionOut)
@@ -75,7 +82,6 @@ def obtener_ubicacion(
     return ubicacion
 
 
-# 🔥 NUEVO ENDPOINT DELETE
 @router.delete("/{ubicacion_id}")
 def eliminar_ubicacion(
     ubicacion_id: int,
