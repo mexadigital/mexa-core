@@ -1,29 +1,25 @@
 from datetime import datetime
-from typing import Optional
-
 from pydantic import BaseModel
 
 
-class MovimientoCreate(BaseModel):
+class MovimientoBase(BaseModel):
     producto_id: int
+    ubicacion_id: int
     tipo: str
     cantidad: int
     usuario: str
-    recibe: Optional[str] = None
-    empleado: Optional[str] = None
-    nota: Optional[str] = None
+    recibe: str | None = None
+    empleado: str | None = None
+    nota: str | None = None
 
 
-class MovimientoOut(BaseModel):
+class MovimientoCreate(MovimientoBase):
+    pass
+
+
+class MovimientoOut(MovimientoBase):
     id: int
     organizacion_id: int
-    producto_id: int
-    tipo: str
-    cantidad: int
-    usuario: str
-    recibe: Optional[str] = None
-    empleado: Optional[str] = None
-    nota: Optional[str] = None
     created_at: datetime
 
     class Config:
