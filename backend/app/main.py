@@ -46,6 +46,11 @@ def run_startup_migrations():
         """))
 
         conn.execute(text("""
+            ALTER TABLE movimientos
+            ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER;
+        """))
+
+        conn.execute(text("""
             ALTER TABLE ubicaciones
             ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
         """))
