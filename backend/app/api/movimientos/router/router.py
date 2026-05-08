@@ -93,7 +93,7 @@ def crear_movimiento(
             detail=f"Stock insuficiente en ubicación. Disponible: {inventario.cantidad}",
         )
 
-    # 🔹 Ajuste real de inventario por ubicación
+    # 🔹 Ajuste real
     if data.tipo == "entrada":
         inventario.cantidad += data.cantidad
         producto.cantidad += data.cantidad  # respaldo temporal
@@ -101,9 +101,11 @@ def crear_movimiento(
         inventario.cantidad -= data.cantidad
         producto.cantidad -= data.cantidad  # respaldo temporal
 
+    # 🔥 FIX IMPORTANTE AQUÍ
     nuevo_movimiento = Movimiento(
         organizacion_id=user.organizacion_id,
         producto_id=data.producto_id,
+        ubicacion_id=data.ubicacion_id,  # 👈 ESTA LÍNEA ES LA QUE FALTABA
         tipo=data.tipo,
         cantidad=data.cantidad,
         usuario=data.usuario,
@@ -140,6 +142,7 @@ def listar_movimientos(
             {
                 "id": mov.id,
                 "producto": prod.nombre,
+                "ubicacion_id": mov.ubicacion_id,  # 👈 opcional pero útil
                 "tipo": mov.tipo,
                 "cantidad": mov.cantidad,
                 "usuario": mov.usuario,
