@@ -5,10 +5,41 @@ from app.db.database import get_db
 from app.models.movimiento import Movimiento
 from app.models.producto import Producto
 from app.models.usuario import Usuario
+from app.models.ubicacion import Ubicacion
+from app.models.inventario_ubicacion import InventarioUbicacion
 from app.schemas.movimiento import MovimientoCreate
 from app.api.auth import get_current_user
 
 router = APIRouter(prefix="/movimientos", tags=["Movimientos"])
+
+
+def obtener_o_crear_inventario(
+    db: Session,
+    organizacion_id: int,
+    producto_id: int,
+    ubicacion_id: int,
+):
+    inventario = (
+        db.query(InventarioUbicacion)
+        .filter(
+            InventarioUbicacion.organizacion_id == organizacion_id,
+            InventarioUbicacion.producto_id == producto_id,
+            InventarioUbicacion.ubicacion_id == ubicacion_id,
+        )
+        .first()
+    )
+
+    if not inventario:
+        inventario = InventarioUbicacion(
+            organizacion_id=organizacion_id,
+            producto_id=producto_id,
+            ubicacion_id=ubicacion_id,
+            cantidad=0,
+        )
+        db.add(inventario)
+        db.flush()
+
+    return inventario
 
 
 # 🔹 CREAR MOVIMIENTO
@@ -22,7 +53,7 @@ def crear_movimiento(
         db.query(Producto)
         .filter(
             Producto.id == data.producto_id,
-            Producto.organizacion_id == user.organizacion_id
+            Producto.organizacion_id == user.organizacion_id,
         )
         .first()
     )
@@ -30,20 +61,45 @@ def crear_movimiento(
     if not producto:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
+    ubicacion = (
+        db.query(Ubicacion)
+        .filter(
+            Ubicacion.id == data.ubicacion_id,
+            Ubicacion.organizacion_id == user.organizacion_id,
+        )
+        .first()
+    )
+
+    if not ubicacion:
+        raise HTTPException(status_code=404, detail="Ubicación no encontrada")
+
     if data.tipo not in ["entrada", "salida"]:
         raise HTTPException(status_code=400, detail="Tipo inválido")
 
     if data.cantidad <= 0:
         raise HTTPException(status_code=400, detail="Cantidad debe ser mayor a 0")
 
-    if data.tipo == "salida" and producto.cantidad < data.cantidad:
-        raise HTTPException(status_code=400, detail="Stock insuficiente")
+    inventario = obtener_o_crear_inventario(
+        db=db,
+        organizacion_id=user.organizacion_id,
+        producto_id=data.producto_id,
+        ubicacion_id=data.ubicacion_id,
+    )
 
-    # 🔹 Ajuste de stock
+    # 🔹 Validar stock por ubicación
+    if data.tipo == "salida" and inventario.cantidad < data.cantidad:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Stock insuficiente en ubicación. Disponible: {inventario.cantidad}",
+        )
+
+    # 🔹 Ajuste real de inventario por ubicación
     if data.tipo == "entrada":
-        producto.cantidad += data.cantidad
+        inventario.cantidad += data.cantidad
+        producto.cantidad += data.cantidad  # respaldo temporal
     else:
-        producto.cantidad -= data.cantidad
+        inventario.cantidad -= data.cantidad
+        producto.cantidad -= data.cantidad  # respaldo temporal
 
     nuevo_movimiento = Movimiento(
         organizacion_id=user.organizacion_id,
@@ -63,7 +119,7 @@ def crear_movimiento(
     return nuevo_movimiento
 
 
-# 🔹 LISTAR MOVIMIENTOS (CON NOMBRE DE PRODUCTO)
+# 🔹 LISTAR MOVIMIENTOS
 @router.get("/")
 def listar_movimientos(
     db: Session = Depends(get_db),
@@ -80,22 +136,24 @@ def listar_movimientos(
     resultado = []
 
     for mov, prod in movimientos:
-        resultado.append({
-            "id": mov.id,
-            "producto": prod.nombre,
-            "tipo": mov.tipo,
-            "cantidad": mov.cantidad,
-            "usuario": mov.usuario,
-            "recibe": mov.recibe,
-            "empleado": mov.empleado,
-            "nota": mov.nota,
-            "created_at": mov.created_at
-        })
+        resultado.append(
+            {
+                "id": mov.id,
+                "producto": prod.nombre,
+                "tipo": mov.tipo,
+                "cantidad": mov.cantidad,
+                "usuario": mov.usuario,
+                "recibe": mov.recibe,
+                "empleado": mov.empleado,
+                "nota": mov.nota,
+                "created_at": mov.created_at,
+            }
+        )
 
     return resultado
 
 
-# 🔹 HERRAMIENTAS PRESTADAS (QUIÉN TIENE QUÉ)
+# 🔹 HERRAMIENTAS PRESTADAS
 @router.get("/prestadas")
 def herramientas_prestadas(
     db: Session = Depends(get_db),
@@ -121,7 +179,7 @@ def herramientas_prestadas(
                     "cantidad": mov.cantidad,
                     "recibe": mov.recibe,
                     "empleado": mov.empleado,
-                    "fecha": mov.created_at
+                    "fecha": mov.created_at,
                 }
             elif mov.tipo == "entrada":
                 estado[key] = None
