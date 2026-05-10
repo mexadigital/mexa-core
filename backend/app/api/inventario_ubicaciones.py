@@ -54,6 +54,48 @@ def obtener_o_crear_inventario(
     return inventario
 
 
+@router.get("/resumen")
+def resumen_inventario_por_ubicacion(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    registros = (
+        db.query(
+            InventarioUbicacion.id.label("inventario_id"),
+            Producto.id.label("producto_id"),
+            Producto.nombre.label("producto"),
+            Producto.codigo.label("codigo"),
+            Producto.tipo.label("tipo"),
+            Ubicacion.id.label("ubicacion_id"),
+            Ubicacion.nombre.label("ubicacion"),
+            Ubicacion.tipo.label("tipo_ubicacion"),
+            InventarioUbicacion.cantidad.label("cantidad"),
+        )
+        .join(Producto, InventarioUbicacion.producto_id == Producto.id)
+        .join(Ubicacion, InventarioUbicacion.ubicacion_id == Ubicacion.id)
+        .filter(InventarioUbicacion.organizacion_id == current_user.organizacion_id)
+        .order_by(Ubicacion.nombre.asc(), Producto.nombre.asc())
+        .all()
+    )
+
+    resultado = []
+
+    for r in registros:
+        resultado.append({
+            "inventario_id": r.inventario_id,
+            "producto_id": r.producto_id,
+            "producto": r.producto,
+            "codigo": r.codigo,
+            "tipo": r.tipo,
+            "ubicacion_id": r.ubicacion_id,
+            "ubicacion": r.ubicacion,
+            "tipo_ubicacion": r.tipo_ubicacion,
+            "cantidad": r.cantidad,
+        })
+
+    return resultado
+
+
 @router.get("/", response_model=list[InventarioUbicacionOut])
 def listar_inventario_ubicaciones(
     producto_id: int | None = Query(default=None),
