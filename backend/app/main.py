@@ -30,6 +30,8 @@ from app.api.ventas import router as ventas_router
 
 def run_startup_migrations():
     with engine.connect() as conn:
+
+        # MOVIMIENTOS
         conn.execute(text("""
             ALTER TABLE movimientos
             ADD COLUMN IF NOT EXISTS recibe VARCHAR;
@@ -50,11 +52,23 @@ def run_startup_migrations():
             ADD COLUMN IF NOT EXISTS ubicacion_id INTEGER;
         """))
 
+        # UBICACIONES
         conn.execute(text("""
             ALTER TABLE ubicaciones
             ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
         """))
 
+        conn.execute(text("""
+            ALTER TABLE ubicaciones
+            ADD COLUMN IF NOT EXISTS responsable VARCHAR;
+        """))
+
+        conn.execute(text("""
+            ALTER TABLE ubicaciones
+            ADD COLUMN IF NOT EXISTS numero_empleado VARCHAR;
+        """))
+
+        # VENTAS
         conn.execute(text("""
             ALTER TABLE ventas
             ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
