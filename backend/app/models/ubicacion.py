@@ -1,5 +1,4 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, func
-
 from app.db.base import Base
 
 
@@ -11,6 +10,10 @@ class Ubicacion(Base):
 
     nombre = Column(String, nullable=False)
     tipo = Column(String, nullable=False, default="sucursal")
+
+    responsable = Column(String, nullable=True)          # 👈 NUEVO
+    numero_empleado = Column(String, nullable=True)      # 👈 NUEVO
+
     activo = Column(Boolean, nullable=False, default=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
