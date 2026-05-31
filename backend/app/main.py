@@ -26,6 +26,7 @@ from app.api.ubicaciones import router as ubicaciones_router
 from app.api.inventario_ubicaciones import router as inventario_ubicaciones_router
 from app.api.traspasos import router as traspasos_router
 from app.api.ventas import router as ventas_router
+from app.api.vales_resguardo import router as vales_resguardo_router
 
 
 def run_startup_migrations():
@@ -118,6 +119,7 @@ app.include_router(ubicaciones_router, prefix="/ubicaciones", tags=["Ubicaciones
 app.include_router(inventario_ubicaciones_router, prefix="/inventario-ubicaciones", tags=["Inventario Ubicaciones"])
 app.include_router(traspasos_router, prefix="/traspasos", tags=["Traspasos"])
 app.include_router(ventas_router, prefix="/ventas", tags=["Ventas"])
+app.include_router(vales_resguardo_router)
 
 
 # =========================
