@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ValeResguardoDetalleCreate(BaseModel):
@@ -31,7 +31,7 @@ class ValeResguardoCreate(BaseModel):
     foto_url: Optional[str] = None
     nota: Optional[str] = None
 
-    detalles: List[ValeResguardoDetalleCreate] = []
+    detalles: List[ValeResguardoDetalleCreate] = Field(default_factory=list)
 
 
 class ValeResguardoDetalleOut(BaseModel):
@@ -75,7 +75,7 @@ class ValeResguardoOut(BaseModel):
     fecha_entrega: datetime
     fecha_cierre: Optional[datetime]
 
-    detalles: List[ValeResguardoDetalleOut] = []
+    detalles: List[ValeResguardoDetalleOut] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
@@ -88,9 +88,21 @@ class DevolucionDetalle(BaseModel):
 
 
 class DevolucionVale(BaseModel):
-    devoluciones: List[DevolucionDetalle]
+    devoluciones: List[DevolucionDetalle] = Field(default_factory=list)
 
 
 class CambiarArchivoFisico(BaseModel):
     ubicacion_fisica_vale: str
     estado_archivo_fisico: str = "archivado"
+
+
+class AgregarDetalleVale(BaseModel):
+    herramienta_nombre: str
+    item_code: Optional[str] = None
+    medida_size: Optional[str] = None
+    unidad: Optional[str] = None
+    marca: Optional[str] = None
+    modelo: Optional[str] = None
+    serie: Optional[str] = None
+    cantidad_entregada: int = 1
+    observacion: Optional[str] = None
