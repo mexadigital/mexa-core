@@ -1,6 +1,9 @@
 from datetime import datetime
+import os
+from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -19,6 +22,17 @@ router = APIRouter(
     prefix="/vales-resguardo",
     tags=["Vales de Resguardo"],
 )
+
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "uploads/vales"))
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+
+MAX_IMAGE_SIZE = 8 * 1024 * 1024
 
 
 # ==========================================================
@@ -362,6 +376,52 @@ def reporte_pendientes_por_empleado(
         "total_pendientes": total_pendientes,
         "vales_pendientes": vales_pendientes,
     }
+
+
+# ==========================================================
+# SUBIR FOTO DEL VALE
+# ==========================================================
+@router.post("/{vale_id}/foto", response_model=ValeResguardoOut)
+async def subir_foto_vale(
+    vale_id: int,
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    vale = obtener_vale_o_404(
+        vale_id=vale_id,
+        db=db,
+        organizacion_id=current_user.organizacion_id,
+    )
+
+    if archivo.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Solo se permiten imágenes JPG, PNG o WEBP",
+        )
+
+    contenido = await archivo.read()
+
+    if not contenido:
+        raise HTTPException(status_code=400, detail="La imagen está vacía")
+
+    if len(contenido) > MAX_IMAGE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail="La imagen no puede pesar más de 8 MB",
+        )
+
+    extension = ALLOWED_IMAGE_TYPES[archivo.content_type]
+    nombre_archivo = f"vale_{vale.id}_{uuid4().hex}{extension}"
+    ruta_archivo = UPLOAD_DIR / nombre_archivo
+    ruta_archivo.write_bytes(contenido)
+
+    vale.foto_url = f"/uploads/vales/{nombre_archivo}"
+
+    db.commit()
+    db.refresh(vale)
+
+    return vale
 
 
 # ==========================================================
