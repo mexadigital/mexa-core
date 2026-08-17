@@ -15,3 +15,17 @@ The project is structured into two main components: Backend powered by FastAPI a
 1. Clone the repository
 2. Set up your environment using the `.env.example` file.
 3. Install dependencies as specified in the `requirements.txt` file.
+
+## MEXA Formularios
+
+El motor configurable está disponible en `/formularios-app`. Permite crear formatos, agregar campos, capturar registros, imprimir o guardar como PDF y preparar mensajes de WhatsApp.
+
+Para cargar la demostración escolar:
+
+```bash
+cd backend
+python -m scripts.crear_demo_formularios
+uvicorn app.main:app --reload
+```
+
+Credenciales demo: `demo@mexa.com` / `MEXA-demo-2026`.
