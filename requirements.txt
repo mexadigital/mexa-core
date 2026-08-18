@@ -10,3 +10,4 @@ bcrypt==4.0.1
 python-multipart==0.0.9
 email-validator==2.2.0
 python-multipart
+qrcode[pil]==7.4.2
