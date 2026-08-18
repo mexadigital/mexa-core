@@ -23,6 +23,7 @@ from app.api.movimientos.router.router import router as movimientos_router
 from app.api.ubicaciones import router as ubicaciones_router
 from app.api.vales_resguardo import router as vales_resguardo_router
 from app.api.formularios import router as formularios_router
+from app.api.escolar import router as escolar_router
 
 # Routers sin prefijo interno.
 from app.api.inventario_ubicaciones import router as inventario_ubicaciones_router
@@ -259,6 +260,7 @@ app.include_router(movimientos_router)
 app.include_router(ubicaciones_router)
 app.include_router(vales_resguardo_router)
 app.include_router(formularios_router)
+app.include_router(escolar_router)
 
 # Estos routers NO tienen prefijo interno.
 app.include_router(
@@ -307,3 +309,8 @@ def health():
 @app.get("/formularios-app", include_in_schema=False)
 def formularios_app():
     return FileResponse(Path(__file__).resolve().parents[1] / "formularios.html")
+
+
+@app.get("/escolar-app", include_in_schema=False)
+def escolar_app():
+    return FileResponse(Path(__file__).resolve().parents[1] / "escolar.html")
