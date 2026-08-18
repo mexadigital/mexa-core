@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -11,7 +11,7 @@ from app.core.deps import get_current_user
 from app.db.base import Base
 from app.db.database import get_db
 from app.main import app
-from app.models.escolar import Alumno, GrupoEscolar
+from app.models.escolar import Alumno, GrupoEscolar, SolicitudConstancia
 from app.models.organizacion import Organizacion
 from app.models.usuario import Usuario
 from app.services.constancias import (
@@ -157,6 +157,20 @@ class FlujoConstanciaApiTest(unittest.TestCase):
         self.assertEqual(documento.status_code, 200)
         self.assertIn("CONSTANCIA DE ESTUDIOS", documento.text)
         self.assertIn("ALUMNA DE PRUEBA", documento.text)
+
+        session = self.Session()
+        token = session.execute(
+            select(SolicitudConstancia.token_verificacion)
+        ).scalar_one()
+        session.close()
+        verificacion = self.client.get(f"/escolar/verificar/{token}")
+        self.assertEqual(verificacion.status_code, 200)
+        self.assertIn("Documento válido", verificacion.text)
+        self.assertIn("A*** D*** P***", verificacion.text)
+
+        datos = self.client.get(f"/escolar/verificar/{token}/datos")
+        self.assertEqual(datos.status_code, 200)
+        self.assertTrue(datos.json()["valida"])
 
 
 if __name__ == "__main__":
