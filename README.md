@@ -29,3 +29,24 @@ uvicorn app.main:app --reload
 ```
 
 Credenciales demo: `demo@mexa.com` / `MEXA-demo-2026`.
+
+
+## MEXA Escolar: constancias verificables
+
+El módulo escolar permite solicitar constancias a partir del padrón de alumnos.
+El pago solamente habilita el proceso: el documento debe pasar por revisión y
+autorización humana antes de poder imprimirse o compartirse.
+
+Flujo implementado:
+
+1. `POST /escolar/constancias`
+2. `PATCH /escolar/constancias/{id}/pago`
+3. `POST /escolar/constancias/{id}/revisar`
+4. `POST /escolar/constancias/{id}/autorizar`
+5. `GET /escolar/constancias/{id}/documento`
+6. `POST /escolar/constancias/{id}/entregar`
+
+La pantalla administrativa está disponible en `/escolar-app`.
+Cada documento autorizado contiene un folio y un QR que apunta a
+`GET /escolar/verificar/{token}`. La consulta pública protege el nombre y la
+matrícula del alumno.
