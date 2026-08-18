@@ -3,5 +3,5 @@ services:
     name: mexa-core
     runtime: python
     plan: starter
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r requirements.txt && cd backend && python -m scripts.crear_demo_formularios
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
