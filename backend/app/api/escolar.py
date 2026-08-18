@@ -442,10 +442,48 @@ def cancelar_constancia(
 
 @router.get(
     "/verificar/{token}",
-    response_model=VerificacionConstanciaOut,
+    response_class=HTMLResponse,
     tags=["Verificación pública"],
 )
 def verificar_constancia(token: str, db: Session = Depends(get_db)):
+    datos = _datos_verificacion(token, db)
+    fecha = datos.fecha_emision.strftime("%d/%m/%Y")
+    estado = datos.estado.replace("_", " ").title()
+    return HTMLResponse(
+        f"""<!doctype html><html lang="es"><head><meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>Documento válido · {escape(datos.folio)}</title><style>
+        *{{box-sizing:border-box}}body{{margin:0;min-height:100vh;display:grid;place-items:center;padding:22px;
+        font-family:Arial,sans-serif;background:linear-gradient(145deg,#061221,#102b46);color:#eaf4ff}}
+        .card{{width:min(620px,100%);background:#0b1b2d;border:1px solid #284767;border-radius:22px;
+        padding:30px;box-shadow:0 22px 60px #0007}}.check{{width:72px;height:72px;margin:0 auto 18px;
+        display:grid;place-items:center;border-radius:50%;background:#16834b;font-size:40px;font-weight:bold}}
+        h1{{text-align:center;margin:0 0 8px;font-size:28px}}.school{{text-align:center;color:#9dc5e8;margin-bottom:26px}}
+        .data{{display:grid;grid-template-columns:1fr 1fr;gap:12px}}.item{{padding:14px;border-radius:12px;
+        background:#071522;border:1px solid #1d3852}}.item.full{{grid-column:1/-1}}.label{{display:block;color:#83a9cb;
+        font-size:12px;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px}}.value{{font-weight:700}}
+        .privacy{{margin:22px 0 0;padding-top:18px;border-top:1px solid #26425e;color:#91a9bf;font-size:12px;line-height:1.5}}
+        .brand{{text-align:center;margin-top:18px;color:#6e91b0;font-size:12px}}@media(max-width:520px){{.card{{padding:22px}}.data{{grid-template-columns:1fr}}.item.full{{grid-column:auto}}}}
+        </style></head><body><main class="card"><div class="check">✓</div><h1>Documento válido</h1>
+        <div class="school">{escape(datos.escuela)}</div><section class="data">
+        <div class="item full"><span class="label">Folio</span><span class="value">{escape(datos.folio)}</span></div>
+        <div class="item"><span class="label">Documento</span><span class="value">Constancia de estudios</span></div>
+        <div class="item"><span class="label">Estado</span><span class="value">{escape(estado)}</span></div>
+        <div class="item full"><span class="label">Alumno</span><span class="value">{escape(datos.alumno)}</span></div>
+        <div class="item"><span class="label">Matrícula</span><span class="value">{escape(datos.matricula)}</span></div>
+        <div class="item"><span class="label">Grupo</span><span class="value">{escape(datos.grupo)}</span></div>
+        <div class="item"><span class="label">Ciclo escolar</span><span class="value">{escape(datos.ciclo_escolar)}</span></div>
+        <div class="item"><span class="label">Fecha de emisión</span><span class="value">{fecha}</span></div>
+        </section><p class="privacy">Por seguridad, el nombre y la matrícula se muestran parcialmente ocultos.
+        La validez corresponde al folio registrado por la institución emisora.</p><div class="brand">Verificado con MEXA Escolar</div>
+        </main></body></html>"""
+    )
+
+
+def _datos_verificacion(
+    token: str,
+    db: Session,
+) -> VerificacionConstanciaOut:
     solicitud = (
         db.query(SolicitudConstancia)
         .filter(SolicitudConstancia.token_verificacion == token)
@@ -468,6 +506,15 @@ def verificar_constancia(token: str, db: Session = Depends(get_db)):
         fecha_emision=solicitud.autorizado_at,
         estado=solicitud.estado,
     )
+
+
+@router.get(
+    "/verificar/{token}/datos",
+    response_model=VerificacionConstanciaOut,
+    tags=["Verificación pública"],
+)
+def datos_verificacion_constancia(token: str, db: Session = Depends(get_db)):
+    return _datos_verificacion(token, db)
 
 
 @router.get("/verificar/{token}/qr.png", include_in_schema=False)
