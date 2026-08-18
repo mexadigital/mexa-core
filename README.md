@@ -16,21 +16,61 @@ The project is structured into two main components: Backend powered by FastAPI a
 2. Set up your environment using the `.env.example` file.
 3. Install dependencies as specified in the `requirements.txt` file.
 
+## Backend activo
+
+La aplicación completa vive en `backend/app`. En Render debe iniciarse con:
+
+```bash
+cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+## OCR de vales
+
+El primer flujo OCR está disponible bajo `/vales-resguardo/ocr`:
+
+- `POST /analizar`: guarda la imagen, evita duplicados por hash y produce una propuesta.
+- `GET /{analisis_id}`: consulta la lectura y su estado.
+- `POST /{analisis_id}/confirmar`: crea el vale únicamente después de revisión humana.
+
+Estados: `SUBIDO`, `PROCESANDO`, `REQUIERE_REVISION`, `CONFIRMADO` y `RECHAZADO`.
+
+La implementación local usa Tesseract cuando está instalado. Si no está disponible,
+el análisis permanece en `REQUIERE_REVISION` y puede completarse manualmente. La
+escritura manuscrita siempre debe verificarse antes de confirmar.
+
+## Trabajadores y usuarios
+
+`Trabajador` es el receptor operativo de EPP, consumibles o herramientas y no
+necesita iniciar sesión. `Usuario` representa a administradores, almacenistas y
+supervisores con acceso al sistema.
+
 ## MEXA Formularios
 
-El motor configurable está disponible en `/formularios-app`. Permite crear formatos, agregar campos, capturar registros, imprimir o guardar como PDF y preparar mensajes de WhatsApp.
+El motor documental configurable está disponible en:
 
-Para cargar la demostración escolar:
+```text
+http://127.0.0.1:8000/formularios-app
+```
+
+Permite crear un formato, agregar campos de texto, número, fecha, teléfono,
+selección o párrafo, capturar registros y abrir una versión imprimible que el
+navegador puede guardar como PDF. También prepara un mensaje de WhatsApp cuando
+el formato contiene un campo cuya clave incluye `telefono`.
+
+Para preparar una demostración escolar con datos ficticios:
 
 ```bash
 cd backend
-python -m scripts.crear_demo_formularios
-uvicorn app.main:app --reload
+../.venv/bin/python -m scripts.crear_demo_formularios
+../.venv/bin/uvicorn app.main:app --reload
 ```
 
-Credenciales demo: `demo@mexa.com` / `MEXA-demo-2026`.
+Credenciales de la demostración:
 
-
+```text
+Usuario: demo@mexa.com
+Contraseña: MEXA-demo-2026
+```
 ## MEXA Escolar: constancias verificables
 
 El módulo escolar permite solicitar constancias a partir del padrón de alumnos.
@@ -46,7 +86,18 @@ Flujo implementado:
 5. `GET /escolar/constancias/{id}/documento`
 6. `POST /escolar/constancias/{id}/entregar`
 
-La pantalla administrativa está disponible en `/escolar-app`.
 Cada documento autorizado contiene un folio y un QR que apunta a
 `GET /escolar/verificar/{token}`. La consulta pública protege el nombre y la
-matrícula del alumno.
+matrícula del alumno. Las solicitudes de original pueden marcarse como listas
+para recoger sin perder el registro digital.
+
+### Primer acceso en Render sin Shell
+
+Configura estas variables privadas en el servicio antes de desplegar:
+
+- `MEXA_BOOTSTRAP_EMAIL`
+- `MEXA_BOOTSTRAP_PASSWORD` (mínimo 12 caracteres)
+
+El build ejecuta `python -m scripts.crear_demo_formularios`. La carga es
+idempotente: crea el administrador, un grupo y un alumno ficticio únicamente
+si todavía no existen. La contraseña nunca se guarda en GitHub.
