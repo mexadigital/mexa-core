@@ -197,6 +197,15 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     run_startup_migrations()
 
+    # El bootstrap es idempotente y sólo actúa cuando existen las variables
+    # privadas MEXA_BOOTSTRAP_EMAIL y MEXA_BOOTSTRAP_PASSWORD.
+    try:
+        from scripts.crear_demo_formularios import crear_demo
+
+        crear_demo()
+    except Exception as exc:  # pragma: no cover
+        logger.exception("No se pudo preparar el acceso inicial: %s", exc)
+
     logger.info(
         "%s %s iniciado correctamente",
         settings.APP_NAME,
