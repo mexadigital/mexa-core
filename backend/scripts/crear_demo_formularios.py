@@ -1,22 +1,30 @@
-"""Crea datos ficticios para probar MEXA Formularios localmente.
+"""Crea datos ficticios para probar MEXA Formularios y Escolar.
 
-Ejecutar desde la carpeta backend:
-    ../.venv/bin/python -m scripts.crear_demo_formularios
+Las credenciales se leen del entorno para no guardar contraseñas en GitHub:
+    MEXA_BOOTSTRAP_EMAIL
+    MEXA_BOOTSTRAP_PASSWORD
 """
+
+import os
 
 from app.core.security import hash_password
 from app.db.base import Base
 from app.db.database import SessionLocal, engine
 from app.models.formulario import CampoFormulario, Formulario
+from app.models.escolar import Alumno, GrupoEscolar
 from app.models.organizacion import Organizacion
 from app.models.usuario import Usuario
 
 
-DEMO_EMAIL = "demo@mexa.com"
-DEMO_PASSWORD = "MEXA-demo-2026"
-
-
 def crear_demo() -> None:
+    demo_email = os.getenv("MEXA_BOOTSTRAP_EMAIL", "").strip().lower()
+    demo_password = os.getenv("MEXA_BOOTSTRAP_PASSWORD", "")
+    if not demo_email or not demo_password:
+        print("Demo omitida: faltan MEXA_BOOTSTRAP_EMAIL y/o MEXA_BOOTSTRAP_PASSWORD")
+        return
+    if len(demo_password) < 12:
+        raise ValueError("MEXA_BOOTSTRAP_PASSWORD debe tener al menos 12 caracteres")
+
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
@@ -35,17 +43,55 @@ def crear_demo() -> None:
             db.add(organizacion)
             db.flush()
 
-        usuario = db.query(Usuario).filter(Usuario.email == DEMO_EMAIL).first()
+        usuario = db.query(Usuario).filter(Usuario.email == demo_email).first()
         if not usuario:
             usuario = Usuario(
                 organizacion_id=organizacion.id,
                 nombre="Auxiliar Demo",
-                email=DEMO_EMAIL,
-                hashed_password=hash_password(DEMO_PASSWORD),
+                email=demo_email,
+                hashed_password=hash_password(demo_password),
                 rol="admin",
                 activo="si",
             )
             db.add(usuario)
+
+        grupo = (
+            db.query(GrupoEscolar)
+            .filter(
+                GrupoEscolar.organizacion_id == organizacion.id,
+                GrupoEscolar.nombre == "3° A",
+                GrupoEscolar.ciclo_escolar == "2026-2027",
+            )
+            .first()
+        )
+        if not grupo:
+            grupo = GrupoEscolar(
+                organizacion_id=organizacion.id,
+                nombre="3° A",
+                grado="Tercero",
+                ciclo_escolar="2026-2027",
+            )
+            db.add(grupo)
+            db.flush()
+
+        alumno = (
+            db.query(Alumno)
+            .filter(
+                Alumno.organizacion_id == organizacion.id,
+                Alumno.matricula == "MEXA-DEMO-001",
+            )
+            .first()
+        )
+        if not alumno:
+            db.add(
+                Alumno(
+                    organizacion_id=organizacion.id,
+                    grupo_id=grupo.id,
+                    matricula="MEXA-DEMO-001",
+                    nombre_completo="ALUMNO DE DEMOSTRACIÓN",
+                    telefono_tutor=None,
+                )
+            )
 
         formulario = (
             db.query(Formulario)
@@ -92,8 +138,8 @@ def crear_demo() -> None:
 
         db.commit()
         print("Demo preparada correctamente")
-        print(f"Usuario: {DEMO_EMAIL}")
-        print(f"Contraseña: {DEMO_PASSWORD}")
+        print(f"Usuario administrador preparado: {demo_email}")
+        print("Contraseña leída de forma privada desde Render")
         print("Pantalla: http://127.0.0.1:8000/formularios-app")
     finally:
         db.close()
