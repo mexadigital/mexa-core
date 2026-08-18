@@ -1,0 +1,555 @@
+from datetime import datetime, timezone
+from html import escape
+from io import BytesIO
+from urllib.parse import quote
+
+import qrcode
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import HTMLResponse, StreamingResponse
+from sqlalchemy.orm import Session
+
+from app.core.deps import get_current_user
+from app.db.database import get_db
+from app.models.escolar import (
+    Alumno,
+    Calificacion,
+    GrupoEscolar,
+    Materia,
+    SolicitudConstancia,
+)
+from app.models.usuario import Usuario
+from app.schemas.escolar import (
+    AlumnoCreate,
+    AlumnoOut,
+    BoletaOut,
+    CalificacionCreate,
+    CalificacionOut,
+    ConstanciaCreate,
+    ConstanciaOut,
+    GrupoCreate,
+    GrupoOut,
+    MateriaCalificacionOut,
+    MateriaCreate,
+    MateriaOut,
+    PagoConstanciaUpdate,
+    VerificacionConstanciaOut,
+)
+from app.services.constancias import (
+    construir_folio,
+    nombre_protegido,
+    nuevo_token_verificacion,
+    validar_transicion,
+)
+
+
+router = APIRouter(prefix="/escolar", tags=["MEXA Escolar"])
+
+
+def _propio_o_404(db: Session, model, record_id: int, user: Usuario):
+    registro = (
+        db.query(model)
+        .filter(
+            model.id == record_id,
+            model.organizacion_id == user.organizacion_id,
+        )
+        .first()
+    )
+    if not registro:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+    return registro
+
+
+@router.post("/grupos", response_model=GrupoOut, status_code=status.HTTP_201_CREATED)
+def crear_grupo(
+    data: GrupoCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    existente = (
+        db.query(GrupoEscolar)
+        .filter(
+            GrupoEscolar.organizacion_id == user.organizacion_id,
+            GrupoEscolar.nombre == data.nombre,
+            GrupoEscolar.ciclo_escolar == data.ciclo_escolar,
+        )
+        .first()
+    )
+    if existente:
+        raise HTTPException(status_code=400, detail="El grupo ya existe en ese ciclo")
+
+    grupo = GrupoEscolar(organizacion_id=user.organizacion_id, **data.model_dump())
+    db.add(grupo)
+    db.commit()
+    db.refresh(grupo)
+    return grupo
+
+
+@router.get("/grupos", response_model=list[GrupoOut])
+def listar_grupos(
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    return (
+        db.query(GrupoEscolar)
+        .filter(GrupoEscolar.organizacion_id == user.organizacion_id)
+        .order_by(GrupoEscolar.ciclo_escolar.desc(), GrupoEscolar.nombre.asc())
+        .all()
+    )
+
+
+@router.post("/alumnos", response_model=AlumnoOut, status_code=status.HTTP_201_CREATED)
+def crear_alumno(
+    data: AlumnoCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    _propio_o_404(db, GrupoEscolar, data.grupo_id, user)
+    existente = (
+        db.query(Alumno)
+        .filter(
+            Alumno.organizacion_id == user.organizacion_id,
+            Alumno.matricula == data.matricula,
+        )
+        .first()
+    )
+    if existente:
+        raise HTTPException(status_code=400, detail="La matrícula ya está registrada")
+
+    alumno = Alumno(organizacion_id=user.organizacion_id, **data.model_dump())
+    db.add(alumno)
+    db.commit()
+    db.refresh(alumno)
+    return alumno
+
+
+@router.get("/alumnos", response_model=list[AlumnoOut])
+def listar_alumnos(
+    grupo_id: int | None = Query(default=None),
+    q: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    query = db.query(Alumno).filter(Alumno.organizacion_id == user.organizacion_id)
+    if grupo_id is not None:
+        query = query.filter(Alumno.grupo_id == grupo_id)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            (Alumno.nombre_completo.ilike(like)) | (Alumno.matricula.ilike(like))
+        )
+    return query.order_by(Alumno.nombre_completo.asc()).all()
+
+
+@router.post("/materias", response_model=MateriaOut, status_code=status.HTTP_201_CREATED)
+def crear_materia(
+    data: MateriaCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    existente = (
+        db.query(Materia)
+        .filter(
+            Materia.organizacion_id == user.organizacion_id,
+            Materia.nombre == data.nombre,
+        )
+        .first()
+    )
+    if existente:
+        raise HTTPException(status_code=400, detail="La materia ya está registrada")
+
+    materia = Materia(organizacion_id=user.organizacion_id, **data.model_dump())
+    db.add(materia)
+    db.commit()
+    db.refresh(materia)
+    return materia
+
+
+@router.get("/materias", response_model=list[MateriaOut])
+def listar_materias(
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    return (
+        db.query(Materia)
+        .filter(Materia.organizacion_id == user.organizacion_id)
+        .order_by(Materia.nombre.asc())
+        .all()
+    )
+
+
+@router.post("/calificaciones", response_model=CalificacionOut)
+def guardar_calificacion(
+    data: CalificacionCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    _propio_o_404(db, Alumno, data.alumno_id, user)
+    _propio_o_404(db, Materia, data.materia_id, user)
+
+    calificacion = (
+        db.query(Calificacion)
+        .filter(
+            Calificacion.organizacion_id == user.organizacion_id,
+            Calificacion.alumno_id == data.alumno_id,
+            Calificacion.materia_id == data.materia_id,
+            Calificacion.periodo == data.periodo,
+        )
+        .first()
+    )
+    if calificacion:
+        calificacion.valor = data.valor
+        calificacion.observaciones = data.observaciones
+    else:
+        calificacion = Calificacion(
+            organizacion_id=user.organizacion_id,
+            **data.model_dump(),
+        )
+        db.add(calificacion)
+
+    db.commit()
+    db.refresh(calificacion)
+    return calificacion
+
+
+@router.get("/boletas/{alumno_id}", response_model=BoletaOut)
+def obtener_boleta(
+    alumno_id: int,
+    periodo: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    alumno = _propio_o_404(db, Alumno, alumno_id, user)
+    grupo = _propio_o_404(db, GrupoEscolar, alumno.grupo_id, user)
+    materias = (
+        db.query(Materia)
+        .filter(Materia.organizacion_id == user.organizacion_id)
+        .order_by(Materia.nombre.asc())
+        .all()
+    )
+    registros = (
+        db.query(Calificacion)
+        .filter(
+            Calificacion.organizacion_id == user.organizacion_id,
+            Calificacion.alumno_id == alumno.id,
+            Calificacion.periodo == periodo,
+        )
+        .all()
+    )
+    valores = {registro.materia_id: registro.valor for registro in registros}
+    calificaciones = [
+        MateriaCalificacionOut(
+            materia_id=materia.id,
+            materia=materia.nombre,
+            valor=valores.get(materia.id),
+        )
+        for materia in materias
+    ]
+    capturadas = [item.valor for item in calificaciones if item.valor is not None]
+    promedio = round(sum(capturadas) / len(capturadas), 2) if capturadas else None
+
+    return BoletaOut(
+        alumno_id=alumno.id,
+        matricula=alumno.matricula,
+        alumno=alumno.nombre_completo,
+        grupo=grupo.nombre,
+        ciclo_escolar=grupo.ciclo_escolar,
+        periodo=periodo,
+        calificaciones=calificaciones,
+        promedio=promedio,
+    )
+
+
+def _constancia_o_404(
+    db: Session,
+    constancia_id: int,
+    user: Usuario,
+) -> SolicitudConstancia:
+    return _propio_o_404(db, SolicitudConstancia, constancia_id, user)
+
+
+def _exigir_rol_autorizador(user: Usuario) -> None:
+    roles = {"admin", "director", "direccion", "control_escolar"}
+    if user.rol.lower() not in roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Se requiere autorización de Dirección o Control Escolar",
+        )
+
+
+@router.post(
+    "/constancias",
+    response_model=ConstanciaOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def solicitar_constancia(
+    data: ConstanciaCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    _propio_o_404(db, Alumno, data.alumno_id, user)
+    consecutivo = (
+        db.query(SolicitudConstancia)
+        .filter(SolicitudConstancia.organizacion_id == user.organizacion_id)
+        .count()
+        + 1
+    )
+    requiere_original = data.medio_entrega in {"recoger_original", "ambos"}
+    estado_pago = "EXENTO" if data.monto == 0 else "PENDIENTE"
+    estado = "SOLICITADA" if estado_pago == "EXENTO" else "PAGO_PENDIENTE"
+    solicitud = SolicitudConstancia(
+        organizacion_id=user.organizacion_id,
+        folio=construir_folio(user.organizacion_id, consecutivo),
+        token_verificacion=nuevo_token_verificacion(),
+        requiere_original=requiere_original,
+        estado_pago=estado_pago,
+        estado=estado,
+        **data.model_dump(),
+    )
+    db.add(solicitud)
+    db.commit()
+    db.refresh(solicitud)
+    return solicitud
+
+
+@router.get("/constancias", response_model=list[ConstanciaOut])
+def listar_constancias(
+    estado: str | None = Query(default=None),
+    alumno_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    query = db.query(SolicitudConstancia).filter(
+        SolicitudConstancia.organizacion_id == user.organizacion_id
+    )
+    if estado:
+        query = query.filter(SolicitudConstancia.estado == estado.upper())
+    if alumno_id is not None:
+        query = query.filter(SolicitudConstancia.alumno_id == alumno_id)
+    return query.order_by(SolicitudConstancia.created_at.desc()).all()
+
+
+@router.get("/constancias/{constancia_id}", response_model=ConstanciaOut)
+def obtener_constancia(
+    constancia_id: int,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    return _constancia_o_404(db, constancia_id, user)
+
+
+@router.patch("/constancias/{constancia_id}/pago", response_model=ConstanciaOut)
+def actualizar_pago_constancia(
+    constancia_id: int,
+    data: PagoConstanciaUpdate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    solicitud = _constancia_o_404(db, constancia_id, user)
+    if solicitud.estado in {"AUTORIZADA", "LISTA_PARA_RECOGER", "ENTREGADA"}:
+        raise HTTPException(status_code=409, detail="El documento ya fue autorizado")
+    solicitud.estado_pago = data.estado_pago
+    solicitud.referencia_pago = data.referencia_pago
+    if data.estado_pago in {"PAGADO", "EXENTO"} and solicitud.estado == "PAGO_PENDIENTE":
+        validar_transicion(solicitud.estado, "SOLICITADA")
+        solicitud.estado = "SOLICITADA"
+    db.commit()
+    db.refresh(solicitud)
+    return solicitud
+
+
+@router.post("/constancias/{constancia_id}/revisar", response_model=ConstanciaOut)
+def revisar_constancia(
+    constancia_id: int,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    solicitud = _constancia_o_404(db, constancia_id, user)
+    if solicitud.estado_pago not in {"PAGADO", "EXENTO"}:
+        raise HTTPException(status_code=409, detail="El pago todavía no está validado")
+    validar_transicion(solicitud.estado, "EN_REVISION")
+    solicitud.estado = "EN_REVISION"
+    solicitud.revisado_por_id = user.id
+    solicitud.revisado_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(solicitud)
+    return solicitud
+
+
+@router.post("/constancias/{constancia_id}/autorizar", response_model=ConstanciaOut)
+def autorizar_constancia(
+    constancia_id: int,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    _exigir_rol_autorizador(user)
+    solicitud = _constancia_o_404(db, constancia_id, user)
+    validar_transicion(solicitud.estado, "AUTORIZADA")
+    solicitud.estado = "AUTORIZADA"
+    solicitud.autorizado_por_id = user.id
+    solicitud.autorizado_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(solicitud)
+    return solicitud
+
+
+@router.post("/constancias/{constancia_id}/lista-recoger", response_model=ConstanciaOut)
+def marcar_lista_para_recoger(
+    constancia_id: int,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    solicitud = _constancia_o_404(db, constancia_id, user)
+    if not solicitud.requiere_original:
+        raise HTTPException(status_code=409, detail="La solicitud no requiere original")
+    validar_transicion(solicitud.estado, "LISTA_PARA_RECOGER")
+    solicitud.estado = "LISTA_PARA_RECOGER"
+    db.commit()
+    db.refresh(solicitud)
+    return solicitud
+
+
+@router.post("/constancias/{constancia_id}/entregar", response_model=ConstanciaOut)
+def entregar_constancia(
+    constancia_id: int,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    solicitud = _constancia_o_404(db, constancia_id, user)
+    validar_transicion(solicitud.estado, "ENTREGADA")
+    solicitud.estado = "ENTREGADA"
+    solicitud.entregado_por_id = user.id
+    solicitud.entregado_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(solicitud)
+    return solicitud
+
+
+@router.post("/constancias/{constancia_id}/cancelar", response_model=ConstanciaOut)
+def cancelar_constancia(
+    constancia_id: int,
+    motivo: str = Query(..., min_length=3),
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    solicitud = _constancia_o_404(db, constancia_id, user)
+    validar_transicion(solicitud.estado, "CANCELADA")
+    solicitud.estado = "CANCELADA"
+    solicitud.observaciones = motivo
+    db.commit()
+    db.refresh(solicitud)
+    return solicitud
+
+
+@router.get(
+    "/verificar/{token}",
+    response_model=VerificacionConstanciaOut,
+    tags=["Verificación pública"],
+)
+def verificar_constancia(token: str, db: Session = Depends(get_db)):
+    solicitud = (
+        db.query(SolicitudConstancia)
+        .filter(SolicitudConstancia.token_verificacion == token)
+        .first()
+    )
+    if not solicitud or solicitud.estado == "CANCELADA":
+        raise HTTPException(status_code=404, detail="Constancia no válida")
+    if solicitud.estado not in {"AUTORIZADA", "LISTA_PARA_RECOGER", "ENTREGADA"}:
+        raise HTTPException(status_code=409, detail="Constancia todavía no emitida")
+    alumno = solicitud.alumno
+    return VerificacionConstanciaOut(
+        valida=True,
+        folio=solicitud.folio,
+        escuela=solicitud.organizacion.nombre,
+        tipo=solicitud.tipo,
+        alumno=nombre_protegido(alumno.nombre_completo),
+        matricula=f"***{alumno.matricula[-4:]}",
+        grupo=alumno.grupo.nombre,
+        ciclo_escolar=alumno.grupo.ciclo_escolar,
+        fecha_emision=solicitud.autorizado_at,
+        estado=solicitud.estado,
+    )
+
+
+@router.get("/verificar/{token}/qr.png", include_in_schema=False)
+def qr_constancia(token: str, request: Request, db: Session = Depends(get_db)):
+    solicitud = (
+        db.query(SolicitudConstancia)
+        .filter(SolicitudConstancia.token_verificacion == token)
+        .first()
+    )
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Constancia no encontrada")
+    url = str(request.url_for("verificar_constancia", token=token))
+    imagen = qrcode.make(url)
+    salida = BytesIO()
+    imagen.save(salida, format="PNG")
+    salida.seek(0)
+    return StreamingResponse(salida, media_type="image/png")
+
+
+@router.get(
+    "/constancias/{constancia_id}/documento",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
+def documento_constancia(
+    constancia_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    solicitud = _constancia_o_404(db, constancia_id, user)
+    if solicitud.estado not in {"AUTORIZADA", "LISTA_PARA_RECOGER", "ENTREGADA"}:
+        raise HTTPException(status_code=409, detail="La constancia aún no está autorizada")
+    alumno = solicitud.alumno
+    grupo = alumno.grupo
+    organizacion = solicitud.organizacion
+    autorizador = solicitud.autorizado_por.nombre if solicitud.autorizado_por else "Dirección"
+    qr_url = request.url_for("qr_constancia", token=solicitud.token_verificacion)
+    verificar_url = request.url_for(
+        "verificar_constancia", token=solicitud.token_verificacion
+    )
+    fecha = solicitud.autorizado_at.strftime("%d/%m/%Y")
+    motivo = f" para {escape(solicitud.motivo)}" if solicitud.motivo else ""
+    whatsapp = ""
+    if alumno.telefono_tutor:
+        mensaje = quote(
+            f"La constancia {solicitud.folio} de {alumno.nombre_completo} "
+            f"fue emitida por {organizacion.nombre}. Verificación: {verificar_url}"
+        )
+        whatsapp = (
+            f'<a class="no-print" href="https://wa.me/{escape(alumno.telefono_tutor)}'
+            f'?text={mensaje}" target="_blank">Preparar mensaje por WhatsApp</a>'
+        )
+    return HTMLResponse(
+        f"""<!doctype html><html lang="es"><head><meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>{escape(solicitud.folio)}</title><style>
+        body{{font-family:Georgia,serif;color:#172033;margin:0;background:#eef2f7}}
+        .hoja{{max-width:760px;margin:28px auto;background:white;padding:64px;box-shadow:0 8px 30px #0002}}
+        h1{{text-align:center;font-size:24px;letter-spacing:2px}} .escuela{{text-align:center;font-size:20px;font-weight:bold}}
+        p{{font-size:17px;line-height:1.8;text-align:justify}} .firma{{margin-top:72px;text-align:center}}
+        .firma-linea{{border-top:1px solid #222;max-width:360px;margin:auto;padding-top:8px}}
+        .pie{{display:flex;gap:20px;align-items:end;margin-top:50px;font:12px Arial,sans-serif}}
+        .pie img{{width:115px;height:115px}} .folio{{font:13px Arial,sans-serif;color:#475569}}
+        .no-print{{display:block;max-width:760px;margin:18px auto;padding:13px;text-align:center;background:#16a34a;color:white;text-decoration:none;border-radius:9px;font:600 14px Arial}}
+        @media print{{body{{background:white}}.hoja{{margin:0;box-shadow:none;max-width:none}}.no-print{{display:none}}}}
+        @media(max-width:700px){{.hoja{{margin:0;padding:32px 22px}}}}
+        </style></head><body>
+        <button class="no-print" onclick="window.print()">Imprimir o guardar como PDF</button>
+        {whatsapp}
+        <main class="hoja"><div class="escuela">{escape(organizacion.nombre)}</div>
+        <h1>CONSTANCIA DE ESTUDIOS</h1>
+        <p>A QUIEN CORRESPONDA:</p>
+        <p>Por medio de la presente se hace constar que <strong>{escape(alumno.nombre_completo)}</strong>,
+        con matrícula <strong>{escape(alumno.matricula)}</strong>, se encuentra inscrito(a) en el grupo
+        <strong>{escape(grupo.nombre)}</strong>, grado <strong>{escape(grupo.grado or grupo.nombre)}</strong>,
+        durante el ciclo escolar <strong>{escape(grupo.ciclo_escolar)}</strong>.</p>
+        <p>Se extiende la presente{motivo} a petición de la persona interesada, el {fecha}.</p>
+        <div class="firma"><div class="firma-linea"><strong>{escape(autorizador)}</strong><br>Persona autorizada</div></div>
+        <div class="pie"><img src="{qr_url}" alt="QR de verificación"><div>
+        <div class="folio"><strong>Folio:</strong> {escape(solicitud.folio)}</div>
+        <div class="folio">Documento verificable en:<br>{escape(str(verificar_url))}</div>
+        <div class="folio">Este documento fue autorizado dentro de MEXA; no representa por sí mismo una firma electrónica avanzada.</div>
+        </div></div></main></body></html>"""
+    )
