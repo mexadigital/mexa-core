@@ -66,6 +66,7 @@ class Alumno(Base):
     )
     matricula = Column(String, nullable=False, index=True)
     nombre_completo = Column(String, nullable=False, index=True)
+    nombre_tutor = Column(String, nullable=True)
     telefono_tutor = Column(String, nullable=True)
     estado = Column(String, nullable=False, default="activo")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

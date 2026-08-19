@@ -116,6 +116,70 @@ class FlujoConstanciaApiTest(unittest.TestCase):
         app.dependency_overrides.clear()
         cls.engine.dispose()
 
+    def test_configuracion_institucional_se_guarda(self):
+        respuesta = self.client.patch(
+            "/escolar/configuracion",
+            json={
+                "nombre": "Colegio Demostración",
+                "cct": "20PES0000X",
+                "domicilio": "Salina Cruz, Oaxaca",
+                "telefono": "9710000000",
+                "correo_institucional": "control@example.test",
+                "logo_url": None,
+                "firmante_nombre": "DIRECTORA DE PRUEBA",
+                "firmante_cargo": "Directora General",
+                "ciclo_escolar_actual": "2026-2027",
+                "color_primario": "#173A5E",
+            },
+        )
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta.json()["cct"], "20PES0000X")
+
+        consulta = self.client.get("/escolar/configuracion")
+        self.assertEqual(consulta.status_code, 200)
+        self.assertEqual(consulta.json()["firmante_cargo"], "Directora General")
+
+    def test_padron_permite_alta_cambio_de_grupo_y_baja_reversible(self):
+        grupo = self.client.post(
+            "/escolar/grupos",
+            json={
+                "nombre": "4° B",
+                "grado": "Cuarto",
+                "ciclo_escolar": "2026-2027",
+            },
+        )
+        self.assertEqual(grupo.status_code, 201)
+
+        alumno = self.client.post(
+            "/escolar/alumnos",
+            json={
+                "grupo_id": grupo.json()["id"],
+                "matricula": "CSC-0002",
+                "nombre_completo": "ALUMNO DE PADRON",
+                "nombre_tutor": "TUTOR DE PRUEBA",
+                "telefono_tutor": "9710000001",
+            },
+        )
+        self.assertEqual(alumno.status_code, 201)
+        self.assertEqual(alumno.json()["nombre_tutor"], "TUTOR DE PRUEBA")
+
+        actualizado = self.client.patch(
+            f"/escolar/alumnos/{alumno.json()['id']}",
+            json={"telefono_tutor": "9710000099", "estado": "inactivo"},
+        )
+        self.assertEqual(actualizado.status_code, 200)
+        self.assertEqual(actualizado.json()["estado"], "inactivo")
+
+        inactivos = self.client.get("/escolar/alumnos?estado=inactivo")
+        self.assertEqual(inactivos.status_code, 200)
+        self.assertIn("CSC-0002", [item["matricula"] for item in inactivos.json()])
+
+        reactivado = self.client.patch(
+            f"/escolar/alumnos/{alumno.json()['id']}",
+            json={"estado": "activo"},
+        )
+        self.assertEqual(reactivado.json()["estado"], "activo")
+
     def test_solicitud_no_se_emite_solo_por_pagar(self):
         creada = self.client.post(
             "/escolar/constancias",
@@ -157,6 +221,9 @@ class FlujoConstanciaApiTest(unittest.TestCase):
         self.assertEqual(documento.status_code, 200)
         self.assertIn("CONSTANCIA DE ESTUDIOS", documento.text)
         self.assertIn("ALUMNA DE PRUEBA", documento.text)
+        self.assertIn("20PES0000X", documento.text)
+        self.assertIn("DIRECTORA DE PRUEBA", documento.text)
+        self.assertIn("Directora General", documento.text)
 
         session = self.Session()
         token = session.execute(
@@ -171,6 +238,7 @@ class FlujoConstanciaApiTest(unittest.TestCase):
         datos = self.client.get(f"/escolar/verificar/{token}/datos")
         self.assertEqual(datos.status_code, 200)
         self.assertTrue(datos.json()["valida"])
+        self.assertEqual(datos.json()["cct"], "20PES0000X")
 
 
 if __name__ == "__main__":

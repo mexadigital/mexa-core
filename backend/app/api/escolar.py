@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 from html import escape
 from io import BytesIO
@@ -17,17 +18,22 @@ from app.models.escolar import (
     Materia,
     SolicitudConstancia,
 )
+from app.models.organizacion import Organizacion
 from app.models.usuario import Usuario
 from app.schemas.escolar import (
     AlumnoCreate,
     AlumnoOut,
+    AlumnoUpdate,
     BoletaOut,
     CalificacionCreate,
     CalificacionOut,
+    ConfiguracionEscolarOut,
+    ConfiguracionEscolarUpdate,
     ConstanciaCreate,
     ConstanciaOut,
     GrupoCreate,
     GrupoOut,
+    GrupoUpdate,
     MateriaCalificacionOut,
     MateriaCreate,
     MateriaOut,
@@ -43,6 +49,68 @@ from app.services.constancias import (
 
 
 router = APIRouter(prefix="/escolar", tags=["MEXA Escolar"])
+
+
+def _texto_limpio(valor: str | None) -> str | None:
+    if valor is None:
+        return None
+    limpio = valor.strip()
+    return limpio or None
+
+
+def _organizacion_actual(db: Session, user: Usuario) -> Organizacion:
+    organizacion = (
+        db.query(Organizacion)
+        .filter(Organizacion.id == user.organizacion_id)
+        .first()
+    )
+    if not organizacion:
+        raise HTTPException(status_code=404, detail="Institución no encontrada")
+    return organizacion
+
+
+@router.get("/configuracion", response_model=ConfiguracionEscolarOut)
+def obtener_configuracion_escolar(
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    return _organizacion_actual(db, user)
+
+
+@router.patch("/configuracion", response_model=ConfiguracionEscolarOut)
+def actualizar_configuracion_escolar(
+    data: ConfiguracionEscolarUpdate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    if user.rol.lower() not in {"admin", "superadmin", "director", "direccion"}:
+        raise HTTPException(
+            status_code=403,
+            detail="Sólo Dirección o Administración puede cambiar la institución",
+        )
+
+    organizacion = _organizacion_actual(db, user)
+    nombre_repetido = (
+        db.query(Organizacion)
+        .filter(
+            Organizacion.nombre == data.nombre.strip(),
+            Organizacion.id != organizacion.id,
+        )
+        .first()
+    )
+    if nombre_repetido:
+        raise HTTPException(
+            status_code=409,
+            detail="Ya existe una institución con ese nombre",
+        )
+    valores = data.model_dump()
+    valores["nombre"] = data.nombre.strip()
+    for campo, valor in valores.items():
+        valor_final = _texto_limpio(valor) if campo != "nombre" else valor
+        setattr(organizacion, campo, valor_final)
+    db.commit()
+    db.refresh(organizacion)
+    return organizacion
 
 
 def _propio_o_404(db: Session, model, record_id: int, user: Usuario):
@@ -65,19 +133,28 @@ def crear_grupo(
     db: Session = Depends(get_db),
     user: Usuario = Depends(get_current_user),
 ):
+    nombre = data.nombre.strip()
+    ciclo = data.ciclo_escolar.strip()
+    if not nombre or not ciclo:
+        raise HTTPException(status_code=422, detail="Grupo y ciclo son obligatorios")
     existente = (
         db.query(GrupoEscolar)
         .filter(
             GrupoEscolar.organizacion_id == user.organizacion_id,
-            GrupoEscolar.nombre == data.nombre,
-            GrupoEscolar.ciclo_escolar == data.ciclo_escolar,
+            GrupoEscolar.nombre == nombre,
+            GrupoEscolar.ciclo_escolar == ciclo,
         )
         .first()
     )
     if existente:
         raise HTTPException(status_code=400, detail="El grupo ya existe en ese ciclo")
 
-    grupo = GrupoEscolar(organizacion_id=user.organizacion_id, **data.model_dump())
+    grupo = GrupoEscolar(
+        organizacion_id=user.organizacion_id,
+        nombre=nombre,
+        grado=_texto_limpio(data.grado),
+        ciclo_escolar=ciclo,
+    )
     db.add(grupo)
     db.commit()
     db.refresh(grupo)
@@ -97,6 +174,45 @@ def listar_grupos(
     )
 
 
+@router.patch("/grupos/{grupo_id}", response_model=GrupoOut)
+def actualizar_grupo(
+    grupo_id: int,
+    data: GrupoUpdate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    grupo = _propio_o_404(db, GrupoEscolar, grupo_id, user)
+    cambios = data.model_dump(exclude_unset=True)
+    if cambios.get("nombre") is None or cambios.get("ciclo_escolar") is None:
+        if "nombre" in cambios or "ciclo_escolar" in cambios:
+            raise HTTPException(status_code=422, detail="Grupo y ciclo no pueden quedar vacíos")
+    for campo in {"nombre", "grado", "ciclo_escolar"} & cambios.keys():
+        cambios[campo] = _texto_limpio(cambios[campo])
+    if not cambios.get("nombre", grupo.nombre) or not cambios.get(
+        "ciclo_escolar", grupo.ciclo_escolar
+    ):
+        raise HTTPException(status_code=422, detail="Grupo y ciclo no pueden quedar vacíos")
+    nombre_final = cambios.get("nombre", grupo.nombre)
+    ciclo_final = cambios.get("ciclo_escolar", grupo.ciclo_escolar)
+    repetido = (
+        db.query(GrupoEscolar)
+        .filter(
+            GrupoEscolar.organizacion_id == user.organizacion_id,
+            GrupoEscolar.nombre == nombre_final,
+            GrupoEscolar.ciclo_escolar == ciclo_final,
+            GrupoEscolar.id != grupo.id,
+        )
+        .first()
+    )
+    if repetido:
+        raise HTTPException(status_code=409, detail="El grupo ya existe en ese ciclo")
+    for campo, valor in cambios.items():
+        setattr(grupo, campo, valor)
+    db.commit()
+    db.refresh(grupo)
+    return grupo
+
+
 @router.post("/alumnos", response_model=AlumnoOut, status_code=status.HTTP_201_CREATED)
 def crear_alumno(
     data: AlumnoCreate,
@@ -104,18 +220,29 @@ def crear_alumno(
     user: Usuario = Depends(get_current_user),
 ):
     _propio_o_404(db, GrupoEscolar, data.grupo_id, user)
+    matricula = data.matricula.strip()
+    nombre = data.nombre_completo.strip()
+    if not matricula or not nombre:
+        raise HTTPException(status_code=422, detail="Matrícula y nombre son obligatorios")
     existente = (
         db.query(Alumno)
         .filter(
             Alumno.organizacion_id == user.organizacion_id,
-            Alumno.matricula == data.matricula,
+            Alumno.matricula == matricula,
         )
         .first()
     )
     if existente:
         raise HTTPException(status_code=400, detail="La matrícula ya está registrada")
 
-    alumno = Alumno(organizacion_id=user.organizacion_id, **data.model_dump())
+    alumno = Alumno(
+        organizacion_id=user.organizacion_id,
+        grupo_id=data.grupo_id,
+        matricula=matricula,
+        nombre_completo=nombre,
+        nombre_tutor=_texto_limpio(data.nombre_tutor),
+        telefono_tutor=_texto_limpio(data.telefono_tutor),
+    )
     db.add(alumno)
     db.commit()
     db.refresh(alumno)
@@ -126,6 +253,7 @@ def crear_alumno(
 def listar_alumnos(
     grupo_id: int | None = Query(default=None),
     q: str | None = Query(default=None),
+    estado: str | None = Query(default=None, pattern="^(activo|inactivo)$"),
     db: Session = Depends(get_db),
     user: Usuario = Depends(get_current_user),
 ):
@@ -137,7 +265,56 @@ def listar_alumnos(
         query = query.filter(
             (Alumno.nombre_completo.ilike(like)) | (Alumno.matricula.ilike(like))
         )
+    if estado:
+        query = query.filter(Alumno.estado == estado)
     return query.order_by(Alumno.nombre_completo.asc()).all()
+
+
+@router.patch("/alumnos/{alumno_id}", response_model=AlumnoOut)
+def actualizar_alumno(
+    alumno_id: int,
+    data: AlumnoUpdate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    alumno = _propio_o_404(db, Alumno, alumno_id, user)
+    cambios = data.model_dump(exclude_unset=True)
+
+    for campo in {"grupo_id", "matricula", "nombre_completo"}:
+        if campo in cambios and cambios[campo] is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Grupo, matrícula y nombre no pueden quedar vacíos",
+            )
+
+    if "grupo_id" in cambios:
+        _propio_o_404(db, GrupoEscolar, cambios["grupo_id"], user)
+    if "matricula" in cambios:
+        matricula = cambios["matricula"].strip()
+        if not matricula:
+            raise HTTPException(status_code=422, detail="La matrícula no puede quedar vacía")
+        repetida = (
+            db.query(Alumno)
+            .filter(
+                Alumno.organizacion_id == user.organizacion_id,
+                Alumno.matricula == matricula,
+                Alumno.id != alumno.id,
+            )
+            .first()
+        )
+        if repetida:
+            raise HTTPException(status_code=409, detail="La matrícula ya está registrada")
+        cambios["matricula"] = matricula
+
+    if "nombre_completo" in cambios and not cambios["nombre_completo"].strip():
+        raise HTTPException(status_code=422, detail="El nombre no puede quedar vacío")
+    for campo in {"nombre_completo", "nombre_tutor", "telefono_tutor"} & cambios.keys():
+        cambios[campo] = _texto_limpio(cambios[campo])
+    for campo, valor in cambios.items():
+        setattr(alumno, campo, valor)
+    db.commit()
+    db.refresh(alumno)
+    return alumno
 
 
 @router.post("/materias", response_model=MateriaOut, status_code=status.HTTP_201_CREATED)
@@ -449,6 +626,7 @@ def verificar_constancia(token: str, db: Session = Depends(get_db)):
     datos = _datos_verificacion(token, db)
     fecha = datos.fecha_emision.strftime("%d/%m/%Y")
     estado = datos.estado.replace("_", " ").title()
+    cct = f" · CCT {escape(datos.cct)}" if datos.cct else ""
     return HTMLResponse(
         f"""<!doctype html><html lang="es"><head><meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -465,7 +643,7 @@ def verificar_constancia(token: str, db: Session = Depends(get_db)):
         .privacy{{margin:22px 0 0;padding-top:18px;border-top:1px solid #26425e;color:#91a9bf;font-size:12px;line-height:1.5}}
         .brand{{text-align:center;margin-top:18px;color:#6e91b0;font-size:12px}}@media(max-width:520px){{.card{{padding:22px}}.data{{grid-template-columns:1fr}}.item.full{{grid-column:auto}}}}
         </style></head><body><main class="card"><div class="check">✓</div><h1>Documento válido</h1>
-        <div class="school">{escape(datos.escuela)}</div><section class="data">
+        <div class="school">{escape(datos.escuela)}{cct}</div><section class="data">
         <div class="item full"><span class="label">Folio</span><span class="value">{escape(datos.folio)}</span></div>
         <div class="item"><span class="label">Documento</span><span class="value">Constancia de estudios</span></div>
         <div class="item"><span class="label">Estado</span><span class="value">{escape(estado)}</span></div>
@@ -498,6 +676,7 @@ def _datos_verificacion(
         valida=True,
         folio=solicitud.folio,
         escuela=solicitud.organizacion.nombre,
+        cct=solicitud.organizacion.cct,
         tipo=solicitud.tipo,
         alumno=nombre_protegido(alumno.nombre_completo),
         matricula=f"***{alumno.matricula[-4:]}",
@@ -551,7 +730,27 @@ def documento_constancia(
     alumno = solicitud.alumno
     grupo = alumno.grupo
     organizacion = solicitud.organizacion
+    color_primario = (
+        organizacion.color_primario
+        if organizacion.color_primario
+        and re.fullmatch(r"#[0-9A-Fa-f]{6}", organizacion.color_primario)
+        else "#1e3a5f"
+    )
     autorizador = solicitud.autorizado_por.nombre if solicitud.autorizado_por else "Dirección"
+    firmante = organizacion.firmante_nombre or autorizador
+    firmante_cargo = organizacion.firmante_cargo or "Persona autorizada"
+    cct = f"CCT: {escape(organizacion.cct)}" if organizacion.cct else ""
+    domicilio = escape(organizacion.domicilio) if organizacion.domicilio else ""
+    contacto = " · ".join(
+        escape(valor)
+        for valor in [organizacion.telefono, organizacion.correo_institucional]
+        if valor
+    )
+    logo = (
+        f'<img class="logo" src="{escape(organizacion.logo_url)}" alt="Logotipo institucional">'
+        if organizacion.logo_url
+        else ""
+    )
     qr_url = request.url_for("qr_constancia", token=solicitud.token_verificacion)
     verificar_url = request.url_for(
         "verificar_constancia", token=solicitud.token_verificacion
@@ -574,6 +773,9 @@ def documento_constancia(
         <title>{escape(solicitud.folio)}</title><style>
         body{{font-family:Georgia,serif;color:#172033;margin:0;background:#eef2f7}}
         .hoja{{max-width:760px;margin:28px auto;background:white;padding:64px;box-shadow:0 8px 30px #0002}}
+        .membrete{{text-align:center;border-bottom:2px solid {color_primario};padding-bottom:18px;margin-bottom:28px}}
+        .logo{{display:block;max-width:110px;max-height:90px;object-fit:contain;margin:0 auto 10px}}
+        .datos-institucion{{font:12px Arial,sans-serif;color:#526277;line-height:1.5}}
         h1{{text-align:center;font-size:24px;letter-spacing:2px}} .escuela{{text-align:center;font-size:20px;font-weight:bold}}
         p{{font-size:17px;line-height:1.8;text-align:justify}} .firma{{margin-top:72px;text-align:center}}
         .firma-linea{{border-top:1px solid #222;max-width:360px;margin:auto;padding-top:8px}}
@@ -585,7 +787,8 @@ def documento_constancia(
         </style></head><body>
         <button class="no-print" onclick="window.print()">Imprimir o guardar como PDF</button>
         {whatsapp}
-        <main class="hoja"><div class="escuela">{escape(organizacion.nombre)}</div>
+        <main class="hoja"><header class="membrete">{logo}<div class="escuela">{escape(organizacion.nombre)}</div>
+        <div class="datos-institucion">{cct}<br>{domicilio}<br>{contacto}</div></header>
         <h1>CONSTANCIA DE ESTUDIOS</h1>
         <p>A QUIEN CORRESPONDA:</p>
         <p>Por medio de la presente se hace constar que <strong>{escape(alumno.nombre_completo)}</strong>,
@@ -593,7 +796,7 @@ def documento_constancia(
         <strong>{escape(grupo.nombre)}</strong>, grado <strong>{escape(grupo.grado or grupo.nombre)}</strong>,
         durante el ciclo escolar <strong>{escape(grupo.ciclo_escolar)}</strong>.</p>
         <p>Se extiende la presente{motivo} a petición de la persona interesada, el {fecha}.</p>
-        <div class="firma"><div class="firma-linea"><strong>{escape(autorizador)}</strong><br>Persona autorizada</div></div>
+        <div class="firma"><div class="firma-linea"><strong>{escape(firmante)}</strong><br>{escape(firmante_cargo)}</div></div>
         <div class="pie"><img src="{qr_url}" alt="QR de verificación"><div>
         <div class="folio"><strong>Folio:</strong> {escape(solicitud.folio)}</div>
         <div class="folio">Documento verificable en:<br>{escape(str(verificar_url))}</div>
