@@ -14,7 +14,10 @@
     .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.actions button{width:auto;padding:9px 12px}
     .item{border:1px solid #203b58;border-radius:13px;padding:14px;margin-top:12px;background:#091625}.item-top{display:flex;justify-content:space-between;gap:12px;align-items:start}.state{font-size:11px;font-weight:bold;padding:6px 8px;border-radius:999px;background:#203a59;white-space:nowrap}
     .folio{font-weight:700}.msg{display:none;padding:11px;border-radius:9px;margin-top:12px}.msg.ok{display:block;background:#143d2a;color:#baf4ce}.msg.err{display:block;background:#4a1f27;color:#ffc3ca}
-    .hidden{display:none!important}.empty{text-align:center;color:#8fa3ba;padding:30px 5px}@media(max-width:820px){.grid{grid-template-columns:1fr}.wrap{padding:14px}.row{grid-template-columns:1fr}}
+    .hidden{display:none!important}.empty{text-align:center;color:#8fa3ba;padding:30px 5px}.full-card{grid-column:1/-1}
+    details summary{cursor:pointer;font-size:19px;font-weight:700}.config-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0 12px;margin-top:12px}
+    .padron-grid{display:grid;grid-template-columns:330px 1fr;gap:18px;margin-top:14px}.mini-list{max-height:360px;overflow:auto}.student{display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid #20354d;padding:11px 2px}.student:last-child{border-bottom:0}.student-actions{display:flex;gap:6px}.student-actions button{width:auto;padding:7px 9px}.inactive{opacity:.55}
+    @media(max-width:820px){.grid,.padron-grid{grid-template-columns:1fr}.wrap{padding:14px}.row,.config-grid{grid-template-columns:1fr}.full-card{grid-column:auto}.student{align-items:flex-start;flex-direction:column}}
   </style>
 </head>
 <body><div class="wrap">
@@ -26,6 +29,50 @@
   </section>
 
   <main id="app" class="grid hidden">
+    <details class="card full-card">
+      <summary>Configuración de la institución</summary>
+      <div class="muted" style="margin-top:7px">Estos datos aparecerán automáticamente en las constancias.</div>
+      <div class="config-grid">
+        <div><label>Nombre de la escuela</label><input id="cfgNombre"></div>
+        <div><label>CCT</label><input id="cfgCct" placeholder="Ej. 20PES0000X"></div>
+        <div><label>Ciclo escolar actual</label><input id="cfgCiclo" placeholder="2026-2027"></div>
+        <div><label>Nombre de quien firma</label><input id="cfgFirmante"></div>
+        <div><label>Cargo</label><input id="cfgCargo" placeholder="Directora General"></div>
+        <div><label>Color institucional</label><input id="cfgColor" type="color" value="#1e3a5f"></div>
+        <div><label>Teléfono</label><input id="cfgTelefono"></div>
+        <div><label>Correo institucional</label><input id="cfgCorreo" type="email"></div>
+        <div><label>URL del logotipo</label><input id="cfgLogo" placeholder="https://..."></div>
+      </div>
+      <label>Domicilio</label><input id="cfgDomicilio">
+      <button style="margin-top:14px;max-width:280px" onclick="guardarConfiguracion()">Guardar configuración</button>
+      <div id="configMsg" class="msg"></div>
+    </details>
+    <details class="card full-card">
+      <summary>Alumnos y grupos</summary>
+      <div class="muted" style="margin-top:7px">Padrón institucional. Las bajas conservan el historial.</div>
+      <div class="padron-grid">
+        <div>
+          <h3>Nuevo grupo</h3>
+          <label>Grupo</label><input id="grupoNombre" placeholder="Ej. 3° A">
+          <label>Grado</label><input id="grupoGrado" placeholder="Ej. Tercero">
+          <label>Ciclo escolar</label><input id="grupoCiclo" placeholder="2026-2027">
+          <button style="margin-top:12px" onclick="crearGrupo()">Guardar grupo</button>
+          <div id="grupoMsg" class="msg"></div>
+          <h3 style="margin-top:24px">Nuevo alumno</h3>
+          <label>Matrícula</label><input id="alumnoMatricula">
+          <label>Nombre completo</label><input id="alumnoNombre">
+          <label>Grupo</label><select id="alumnoGrupo"></select>
+          <label>Nombre del tutor</label><input id="alumnoTutor">
+          <label>Teléfono del tutor</label><input id="alumnoTelefono">
+          <button class="green" style="margin-top:12px" onclick="crearAlumno()">Guardar alumno</button>
+          <div id="alumnoMsg" class="msg"></div>
+        </div>
+        <div>
+          <div class="row"><input id="buscarPadron" placeholder="Buscar nombre o matrícula"><button onclick="cargarPadron()">Buscar</button></div>
+          <div id="padronLista" class="mini-list empty">Cargando padrón…</div>
+        </div>
+      </div>
+    </details>
     <section class="card"><h2>Nueva solicitud</h2>
       <label>Buscar por nombre o matrícula</label><div class="row"><input id="buscar" placeholder="Ej. ANA o A-102"><button onclick="cargarAlumnos()">Buscar</button></div>
       <label>Alumno</label><select id="alumno"></select>
@@ -42,14 +89,22 @@
     </section>
   </main>
 </div><script>
-  let token=localStorage.getItem('mexa_token')||''; let alumnos=[];
+  let token=localStorage.getItem('mexa_token')||''; let alumnos=[];let grupos=[];let padron=[];
   const $=id=>document.getElementById(id); const apiBase=location.origin;
   function msg(id,texto,ok=true){const e=$(id);e.textContent=texto;e.className='msg '+(ok?'ok':'err')}
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   async function api(path,opt={}){const h={...(opt.headers||{})};if(token)h.Authorization='Bearer '+token;if(opt.body)h['Content-Type']='application/json';const r=await fetch(apiBase+path,{...opt,headers:h});if(!r.ok){let d='Error '+r.status;try{d=(await r.json()).detail||d}catch{}throw new Error(d)}return r}
   async function entrar(){try{const r=await api('/auth/login',{method:'POST',body:JSON.stringify({email:$('email').value.trim(),password:$('password').value})});token=(await r.json()).access_token;localStorage.setItem('mexa_token',token);await iniciar()}catch(e){msg('loginMsg',e.message,false)}}
-  async function iniciar(){try{const me=await(await api('/auth/me')).json();$('sesion').textContent=me.nombre+' · '+me.organizacion_nombre;$('login').classList.add('hidden');$('app').classList.remove('hidden');await cargarAlumnos();await cargarSolicitudes()}catch{token='';localStorage.removeItem('mexa_token');$('login').classList.remove('hidden');$('app').classList.add('hidden')}}
-  async function cargarAlumnos(){try{const q=$('buscar').value.trim();alumnos=await(await api('/escolar/alumnos'+(q?'?q='+encodeURIComponent(q):''))).json();$('alumno').innerHTML=alumnos.length?alumnos.map(a=>`<option value="${a.id}">${esc(a.matricula)} · ${esc(a.nombre_completo)}</option>`).join(''):'<option value="">Sin resultados</option>'}catch(e){msg('formMsg',e.message,false)}}
+  async function iniciar(){try{const me=await(await api('/auth/me')).json();$('sesion').textContent=me.nombre+' · '+me.organizacion_nombre;$('login').classList.add('hidden');$('app').classList.remove('hidden');await cargarConfiguracion();await cargarGrupos();await cargarAlumnos();await cargarPadron();await cargarSolicitudes()}catch{token='';localStorage.removeItem('mexa_token');$('login').classList.remove('hidden');$('app').classList.add('hidden')}}
+  async function cargarConfiguracion(){try{const c=await(await api('/escolar/configuracion')).json();$('cfgNombre').value=c.nombre||'';$('cfgCct').value=c.cct||'';$('cfgCiclo').value=c.ciclo_escolar_actual||'';$('cfgFirmante').value=c.firmante_nombre||'';$('cfgCargo').value=c.firmante_cargo||'';$('cfgColor').value=c.color_primario||'#1e3a5f';$('cfgTelefono').value=c.telefono||'';$('cfgCorreo').value=c.correo_institucional||'';$('cfgLogo').value=c.logo_url||'';$('cfgDomicilio').value=c.domicilio||''}catch(e){msg('configMsg',e.message,false)}}
+  async function guardarConfiguracion(){try{const valor=id=>$(id).value.trim()||null;const nombre=$('cfgNombre').value.trim();if(!nombre)throw new Error('Escribe el nombre de la escuela');await api('/escolar/configuracion',{method:'PATCH',body:JSON.stringify({nombre,cct:valor('cfgCct'),ciclo_escolar_actual:valor('cfgCiclo'),firmante_nombre:valor('cfgFirmante'),firmante_cargo:valor('cfgCargo'),color_primario:$('cfgColor').value,telefono:valor('cfgTelefono'),correo_institucional:valor('cfgCorreo'),logo_url:valor('cfgLogo'),domicilio:valor('cfgDomicilio')})});msg('configMsg','Configuración guardada. Las nuevas constancias usarán estos datos.');await cargarConfiguracion()}catch(e){msg('configMsg',e.message,false)}}
+  async function cargarGrupos(){grupos=await(await api('/escolar/grupos')).json();$('alumnoGrupo').innerHTML=grupos.filter(g=>g.estado==='activo').map(g=>`<option value="${g.id}">${esc(g.nombre)} · ${esc(g.ciclo_escolar)}</option>`).join('')||'<option value="">Primero crea un grupo</option>';if(!$('grupoCiclo').value){const cfg=await(await api('/escolar/configuracion')).json();$('grupoCiclo').value=cfg.ciclo_escolar_actual||''}}
+  async function crearGrupo(){try{const nombre=$('grupoNombre').value.trim(),ciclo=$('grupoCiclo').value.trim();if(!nombre||!ciclo)throw new Error('Completa el grupo y el ciclo escolar');await api('/escolar/grupos',{method:'POST',body:JSON.stringify({nombre,grado:$('grupoGrado').value.trim()||null,ciclo_escolar:ciclo})});msg('grupoMsg','Grupo guardado.');$('grupoNombre').value='';$('grupoGrado').value='';await cargarGrupos()}catch(e){msg('grupoMsg',e.message,false)}}
+  async function crearAlumno(){try{const grupo_id=Number($('alumnoGrupo').value);if(!grupo_id)throw new Error('Primero selecciona un grupo');await api('/escolar/alumnos',{method:'POST',body:JSON.stringify({grupo_id,matricula:$('alumnoMatricula').value.trim(),nombre_completo:$('alumnoNombre').value.trim(),nombre_tutor:$('alumnoTutor').value.trim()||null,telefono_tutor:$('alumnoTelefono').value.trim()||null})});msg('alumnoMsg','Alumno guardado en el padrón.');['alumnoMatricula','alumnoNombre','alumnoTutor','alumnoTelefono'].forEach(id=>$(id).value='');await cargarAlumnos();await cargarPadron()}catch(e){msg('alumnoMsg',e.message,false)}}
+  async function cargarPadron(){try{const q=$('buscarPadron').value.trim();padron=await(await api('/escolar/alumnos'+(q?'?q='+encodeURIComponent(q):''))).json();$('padronLista').className='mini-list';$('padronLista').innerHTML=padron.length?padron.map(a=>{const g=grupos.find(x=>x.id===a.grupo_id);return `<div class="student ${a.estado==='inactivo'?'inactive':''}"><div><strong>${esc(a.nombre_completo)}</strong><div class="muted">${esc(a.matricula)} · ${esc(g?.nombre||'Sin grupo')} · ${esc(a.estado)}</div><div class="muted">Tutor: ${esc(a.nombre_tutor||'Sin registrar')} · ${esc(a.telefono_tutor||'Sin teléfono')}</div></div><div class="student-actions"><button class="gray" onclick="editarAlumno(${a.id})">Editar</button><button class="${a.estado==='activo'?'red':'green'}" onclick="cambiarEstadoAlumno(${a.id},'${a.estado==='activo'?'inactivo':'activo'}')">${a.estado==='activo'?'Baja':'Activar'}</button></div></div>`}).join(''):'<div class="empty">Sin alumnos.</div>'}catch(e){$('padronLista').innerHTML='<div class="msg err">'+esc(e.message)+'</div>'}}
+  async function editarAlumno(id){const a=padron.find(x=>x.id===id);if(!a)return;const nombre=prompt('Nombre completo:',a.nombre_completo);if(nombre===null)return;const matricula=prompt('Matrícula:',a.matricula);if(matricula===null)return;const tutor=prompt('Nombre del tutor:',a.nombre_tutor||'');if(tutor===null)return;const telefono=prompt('Teléfono del tutor:',a.telefono_tutor||'');if(telefono===null)return;const opciones=grupos.filter(g=>g.estado==='activo').map(g=>`${g.id}: ${g.nombre}`).join('\n');const grupo_id=Number(prompt('ID del grupo:\n'+opciones,a.grupo_id));if(!grupo_id)return;try{await api(`/escolar/alumnos/${id}`,{method:'PATCH',body:JSON.stringify({nombre_completo:nombre,matricula,grupo_id,nombre_tutor:tutor||null,telefono_tutor:telefono||null})});await cargarAlumnos();await cargarPadron()}catch(e){alert(e.message)}}
+  async function cambiarEstadoAlumno(id,estado){if(!confirm(estado==='inactivo'?'El alumno dejará de aparecer como activo, pero conservará su historial.':'¿Reactivar este alumno?'))return;try{await api(`/escolar/alumnos/${id}`,{method:'PATCH',body:JSON.stringify({estado})});await cargarAlumnos();await cargarPadron()}catch(e){alert(e.message)}}
+  async function cargarAlumnos(){try{const q=$('buscar').value.trim();const params=new URLSearchParams({estado:'activo'});if(q)params.set('q',q);alumnos=await(await api('/escolar/alumnos?'+params)).json();$('alumno').innerHTML=alumnos.length?alumnos.map(a=>`<option value="${a.id}">${esc(a.matricula)} · ${esc(a.nombre_completo)}</option>`).join(''):'<option value="">Sin resultados</option>'}catch(e){msg('formMsg',e.message,false)}}
   async function crearSolicitud(){try{const alumno_id=Number($('alumno').value);if(!alumno_id)throw new Error('Selecciona un alumno');await api('/escolar/constancias',{method:'POST',body:JSON.stringify({alumno_id,tipo:$('tipo').value,motivo:$('motivo').value.trim()||null,destinatario:$('destinatario').value.trim()||null,medio_entrega:$('medio').value,monto:Number($('monto').value||0),observaciones:$('observaciones').value.trim()||null})});msg('formMsg','Solicitud creada. No se emitirá hasta revisarla y autorizarla.');await cargarSolicitudes()}catch(e){msg('formMsg',e.message,false)}}
   function alumnoNombre(id){return alumnos.find(a=>a.id===id)?.nombre_completo||('Alumno #'+id)}
   function botones(s){let b='';if(s.estado==='PAGO_PENDIENTE')b+=`<button class="green" onclick="pago(${s.id})">Validar pago</button>`;if(s.estado==='SOLICITADA')b+=`<button onclick="accion(${s.id},'revisar')">Revisar</button>`;if(s.estado==='EN_REVISION')b+=`<button class="gold" onclick="accion(${s.id},'autorizar')">Autorizar</button>`;if(s.estado==='AUTORIZADA'||s.estado==='LISTA_PARA_RECOGER'||s.estado==='ENTREGADA')b+=`<button class="gray" onclick="documento(${s.id})">Abrir PDF</button>`;if(s.estado==='AUTORIZADA'&&s.requiere_original)b+=`<button onclick="accion(${s.id},'lista-recoger')">Lista para recoger</button>`;if(s.estado==='AUTORIZADA'||s.estado==='LISTA_PARA_RECOGER')b+=`<button class="green" onclick="accion(${s.id},'entregar')">Entregar</button>`;if(!['ENTREGADA','CANCELADA'].includes(s.estado))b+=`<button class="red" onclick="cancelar(${s.id})">Cancelar</button>`;return b}
