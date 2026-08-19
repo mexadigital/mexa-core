@@ -145,6 +145,20 @@ def run_startup_migrations() -> None:
     # VENTAS
     _add_column_if_missing("ventas", "created_at", timestamp_default)
 
+    # IDENTIDAD DE LA INSTITUCIÓN PARA MEXA ESCOLAR
+    _add_column_if_missing("organizaciones", "cct", "VARCHAR")
+    _add_column_if_missing("organizaciones", "domicilio", "VARCHAR")
+    _add_column_if_missing("organizaciones", "telefono", "VARCHAR")
+    _add_column_if_missing("organizaciones", "correo_institucional", "VARCHAR")
+    _add_column_if_missing("organizaciones", "logo_url", "VARCHAR")
+    _add_column_if_missing("organizaciones", "firmante_nombre", "VARCHAR")
+    _add_column_if_missing("organizaciones", "firmante_cargo", "VARCHAR")
+    _add_column_if_missing("organizaciones", "ciclo_escolar_actual", "VARCHAR")
+    _add_column_if_missing("organizaciones", "color_primario", "VARCHAR")
+
+    # PADRÓN ESCOLAR
+    _add_column_if_missing("alumnos", "nombre_tutor", "VARCHAR")
+
     # VALES DE RESGUARDO
     _add_column_if_missing("vales_resguardo", "numero_empleado", "VARCHAR")
     _add_column_if_missing(
