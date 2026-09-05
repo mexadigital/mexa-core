@@ -22,6 +22,10 @@ def now_utc():
     return datetime.now(timezone.utc)
 
 
+def normalizar_fecha(valor: datetime) -> datetime:
+    return valor if valor.tzinfo is not None else valor.replace(tzinfo=timezone.utc)
+
+
 def org_id(user: Usuario) -> int:
     return user.organizacion_id
 
@@ -54,10 +58,8 @@ def turno_abierto(db: Session, organizacion_id: int) -> ParkingTurno | None:
 
 
 def calc_importe(entrada: datetime, salida: datetime, tarifa: ParkingTarifa) -> tuple[int, Decimal]:
-    if entrada.tzinfo is None:
-        entrada = entrada.replace(tzinfo=timezone.utc)
-    if salida.tzinfo is None:
-        salida = salida.replace(tzinfo=timezone.utc)
+    entrada = normalizar_fecha(entrada)
+    salida = normalizar_fecha(salida)
     minutos = max(0, math.floor((salida - entrada).total_seconds() / 60))
     tolerancia = int(tarifa.tolerancia_minutos or 5)
     horas = 1 if minutos <= 60 + tolerancia else 1 + math.ceil((minutos - (60 + tolerancia)) / 60)
@@ -66,6 +68,12 @@ def calc_importe(entrada: datetime, salida: datetime, tarifa: ParkingTarifa) -> 
 
 def movimiento_dict(m: ParkingMovimiento):
     return {"id": m.id, "placa": m.placa, "tipo_vehiculo": m.tipo_vehiculo, "entrada_at": m.entrada_at, "salida_real_at": m.salida_real_at, "cierre_sistema_at": m.cierre_sistema_at, "minutos_cobrados": m.minutos_cobrados, "importe": float(m.importe or 0), "estado": m.estado, "nota": m.nota, "motivo_sin_estacionarse": m.motivo_sin_estacionarse, "creado_por": m.creado_por}
+
+
+def agregar_nota(m: ParkingMovimiento, texto: str | None):
+    if not texto:
+        return
+    m.nota = " | ".join([x for x in [m.nota, texto] if x])
 
 
 class SetupIn(BaseModel):
@@ -86,6 +94,13 @@ class EntradaIn(BaseModel):
     telefono: str | None = None
     distinguido: bool = False
     nota: str | None = None
+    entrada_real_at: datetime | None = None
+    motivo_correccion: str | None = None
+
+
+class CorregirEntradaIn(BaseModel):
+    entrada_real_at: datetime
+    motivo_correccion: str
 
 
 class SalidaIn(BaseModel):
@@ -192,6 +207,13 @@ def entrada(data: EntradaIn, current_user: Usuario = Depends(get_current_user), 
     if tipo not in DEFAULT_TARIFAS:
         raise HTTPException(400, "Tipo de vehículo inválido")
     tarifa_activa(db, oid, tipo)
+    sistema = now_utc()
+    entrada_real = normalizar_fecha(data.entrada_real_at) if data.entrada_real_at else sistema
+    if entrada_real > sistema:
+        raise HTTPException(400, "La hora de entrada no puede estar en el futuro")
+    diferencia = abs((sistema - entrada_real).total_seconds()) / 60
+    if diferencia > 2 and not (data.motivo_correccion or "").strip():
+        raise HTTPException(400, "La corrección de hora de entrada requiere motivo")
     placa = (data.placa or "SIN PLACA").strip().upper()
     cliente = None
     if placa != "SIN PLACA":
@@ -207,8 +229,31 @@ def entrada(data: EntradaIn, current_user: Usuario = Depends(get_current_user), 
             cliente.telefono = data.telefono
         cliente.distinguido = bool(data.distinguido or cliente.distinguido)
         cliente.tipo_vehiculo = tipo
-    m = ParkingMovimiento(organizacion_id=oid, turno_id=turno.id, cliente_id=cliente.id if cliente else None, placa=placa, tipo_vehiculo=tipo, entrada_at=now_utc(), estado="dentro", nota=data.nota, creado_por=current_user.nombre)
+    m = ParkingMovimiento(organizacion_id=oid, turno_id=turno.id, cliente_id=cliente.id if cliente else None, placa=placa, tipo_vehiculo=tipo, entrada_at=entrada_real, estado="dentro", nota=data.nota, creado_por=current_user.nombre)
+    if data.entrada_real_at and diferencia > 2:
+        agregar_nota(m, f"Entrada corregida: {data.motivo_correccion.strip()}")
     db.add(m)
+    db.commit()
+    db.refresh(m)
+    return movimiento_dict(m)
+
+
+@router.post("/movimientos/{movimiento_id}/corregir-entrada")
+def corregir_entrada(movimiento_id: int, data: CorregirEntradaIn, current_user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
+    oid = org_id(current_user)
+    m = db.query(ParkingMovimiento).filter(ParkingMovimiento.id == movimiento_id, ParkingMovimiento.organizacion_id == oid, ParkingMovimiento.estado == "dentro").first()
+    if not m:
+        raise HTTPException(404, "Movimiento activo no encontrado")
+    motivo = (data.motivo_correccion or "").strip()
+    if not motivo:
+        raise HTTPException(400, "Escribe el motivo de la corrección")
+    entrada_real = normalizar_fecha(data.entrada_real_at)
+    sistema = now_utc()
+    if entrada_real > sistema:
+        raise HTTPException(400, "La hora de entrada no puede estar en el futuro")
+    anterior = m.entrada_at
+    m.entrada_at = entrada_real
+    agregar_nota(m, f"Entrada corregida de {anterior} a {entrada_real}: {motivo}")
     db.commit()
     db.refresh(m)
     return movimiento_dict(m)
@@ -221,9 +266,11 @@ def salida(movimiento_id: int, data: SalidaIn, current_user: Usuario = Depends(g
     if not m or m.estado != "dentro":
         raise HTTPException(404, "Movimiento activo no encontrado")
     sistema = now_utc()
-    salida_real = data.salida_real_at or sistema
-    if salida_real.tzinfo is None:
-        salida_real = salida_real.replace(tzinfo=timezone.utc)
+    salida_real = normalizar_fecha(data.salida_real_at) if data.salida_real_at else sistema
+    if salida_real > sistema:
+        raise HTTPException(400, "La hora de salida no puede estar en el futuro")
+    if salida_real < normalizar_fecha(m.entrada_at):
+        raise HTTPException(400, "La salida no puede ser anterior a la entrada")
     diferencia = abs((sistema - salida_real).total_seconds()) / 60
     if diferencia > 2 and not (data.motivo_correccion or "").strip():
         raise HTTPException(400, "La corrección de hora requiere motivo")
@@ -234,7 +281,7 @@ def salida(movimiento_id: int, data: SalidaIn, current_user: Usuario = Depends(g
     m.minutos_cobrados = minutos
     m.importe = importe
     m.estado = "cerrado"
-    notas = [x for x in [m.nota, data.nota, f"Corrección: {data.motivo_correccion}" if data.motivo_correccion else None] if x]
+    notas = [x for x in [m.nota, data.nota, f"Salida corregida: {data.motivo_correccion}" if data.motivo_correccion else None] if x]
     m.nota = " | ".join(notas) if notas else None
     db.commit()
     db.refresh(m)
