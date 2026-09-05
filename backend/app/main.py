@@ -91,6 +91,10 @@ def run_startup_migrations() -> None:
     _add_column_if_missing("movimientos", "nota", "VARCHAR")
     _add_column_if_missing("movimientos", "ubicacion_id", "INTEGER")
 
+    # CAPITAL PARKING
+    _add_column_if_missing("parking_movimientos", "modelo", "VARCHAR(120)")
+    _add_column_if_missing("parking_movimientos", "color", "VARCHAR(60)")
+
     # UBICACIONES
     _add_column_if_missing("ubicaciones", "created_at", timestamp_default)
     _add_column_if_missing("ubicaciones", "responsable", "VARCHAR")
