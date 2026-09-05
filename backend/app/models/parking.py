@@ -57,6 +57,8 @@ class ParkingMovimiento(Base):
     cliente_id = Column(Integer, ForeignKey("parking_clientes.id"), nullable=True, index=True)
     placa = Column(String(30), nullable=True, index=True)
     tipo_vehiculo = Column(String(30), nullable=False, index=True)
+    modelo = Column(String(120), nullable=True)
+    color = Column(String(60), nullable=True)
     entrada_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False, index=True)
     salida_real_at = Column(DateTime(timezone=True), nullable=True)
     cierre_sistema_at = Column(DateTime(timezone=True), nullable=True)
