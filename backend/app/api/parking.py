@@ -67,7 +67,7 @@ def calc_importe(entrada: datetime, salida: datetime, tarifa: ParkingTarifa) -> 
 
 
 def movimiento_dict(m: ParkingMovimiento):
-    return {"id": m.id, "placa": m.placa, "tipo_vehiculo": m.tipo_vehiculo, "entrada_at": m.entrada_at, "salida_real_at": m.salida_real_at, "cierre_sistema_at": m.cierre_sistema_at, "minutos_cobrados": m.minutos_cobrados, "importe": float(m.importe or 0), "estado": m.estado, "nota": m.nota, "motivo_sin_estacionarse": m.motivo_sin_estacionarse, "creado_por": m.creado_por}
+    return {"id": m.id, "placa": m.placa, "tipo_vehiculo": m.tipo_vehiculo, "modelo": m.modelo, "color": m.color, "entrada_at": m.entrada_at, "salida_real_at": m.salida_real_at, "cierre_sistema_at": m.cierre_sistema_at, "minutos_cobrados": m.minutos_cobrados, "importe": float(m.importe or 0), "estado": m.estado, "nota": m.nota, "motivo_sin_estacionarse": m.motivo_sin_estacionarse, "creado_por": m.creado_por}
 
 
 def agregar_nota(m: ParkingMovimiento, texto: str | None):
@@ -90,6 +90,8 @@ class AbrirTurnoIn(BaseModel):
 class EntradaIn(BaseModel):
     placa: str | None = None
     tipo_vehiculo: str
+    modelo: str | None = None
+    color: str | None = None
     nombre_cliente: str | None = None
     telefono: str | None = None
     distinguido: bool = False
@@ -229,7 +231,7 @@ def entrada(data: EntradaIn, current_user: Usuario = Depends(get_current_user), 
             cliente.telefono = data.telefono
         cliente.distinguido = bool(data.distinguido or cliente.distinguido)
         cliente.tipo_vehiculo = tipo
-    m = ParkingMovimiento(organizacion_id=oid, turno_id=turno.id, cliente_id=cliente.id if cliente else None, placa=placa, tipo_vehiculo=tipo, entrada_at=entrada_real, estado="dentro", nota=data.nota, creado_por=current_user.nombre)
+    m = ParkingMovimiento(organizacion_id=oid, turno_id=turno.id, cliente_id=cliente.id if cliente else None, placa=placa, tipo_vehiculo=tipo, modelo=(data.modelo or "").strip() or None, color=(data.color or "").strip() or None, entrada_at=entrada_real, estado="dentro", nota=data.nota, creado_por=current_user.nombre)
     if data.entrada_real_at and diferencia > 2:
         agregar_nota(m, f"Entrada corregida: {data.motivo_correccion.strip()}")
     db.add(m)
